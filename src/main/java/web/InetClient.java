@@ -29,7 +29,11 @@ public class InetClient {
       do {
         System.out.print("Enter a hostname or an IP address, (quit) to end: ");
         System.out.flush();
+        // This will read user input from the keyboard
         name = in.readLine();
+        if (name.indexOf("quit") < 0) {
+          getRemoteAddress(name, serverName);
+        }
       } while (name.indexOf("quit") < 0);
       System.out.println("Cancelled by user request.");
     } catch (IOException e) {
@@ -57,6 +61,7 @@ public class InetClient {
       // Read two or three lines of response from the server,
       // and block while synchronously waiting:
       for(int i = 0; i <= 3; ++i) {
+        // This will
         textFromServer = fromServer.readLine();
         if (textFromServer != null) { // always use brackets, always
           System.out.println(textFromServer);

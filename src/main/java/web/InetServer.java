@@ -1,8 +1,11 @@
-// Based on InetServer. Elliot, after Huges, Shoffner, Winslow
+package web;// Based on web.InetServer. Elliot, after Huges, Shoffner, Winslow
 // DePaul CSC 435, Autumn 2019
+// Robert David Hernandez, rherna57@mail.depaul.edu
 
 // I prefer to be explicit rather than implicit, but I can see value in wildcard imports
 // If the list is large enough to make it a distraction
+
+import common.TextUtil;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -52,21 +55,10 @@ class Worker extends Thread {
       outStream.println("Looking up " + name + "...");
       InetAddress machine = InetAddress.getByName(name);
       outStream.println("Host name : " + machine.getHostName());
-      outStream.println("Host IP : " + toText(machine.getAddress()));
+      outStream.println("Host IP : " + TextUtil.toText(machine.getAddress()));
     } catch (UnknownHostException e) {
       outStream.println("Failed to attempt to look up " + name);
     }
-  }
-
-  // Converts to 128 bit portable format
-  private String toText(byte ip[]) {
-    final StringBuffer result = new StringBuffer();
-    for (int i = 0; i < ip.length; ++i) {
-      if (i > 0) {
-        result.append(0xff & ip[i]);
-      }
-    }
-    return result.toString();
   }
 }
 

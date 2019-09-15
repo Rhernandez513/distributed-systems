@@ -1,3 +1,6 @@
+// Based on InetServer. Elliot, after Huges, Shoffner, Winslow
+// DePaul CSC 435, Autumn 2019
+
 // I prefer to be explicit rather than implicit, but I can see value in wildcard imports
 // If the list is large enough to make it a distraction
 

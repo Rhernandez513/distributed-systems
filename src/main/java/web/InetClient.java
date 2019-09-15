@@ -3,8 +3,6 @@ package web;// Based on web.InetClient, a client for web.InetServer. Elliot, aft
 // DePaul CSC 435, Autumn 2019
 // Robert David Hernandez, rherna57@mail.depaul.edu
 
-import common.TextUtil;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;

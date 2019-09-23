@@ -4,10 +4,7 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Random;
+import java.util.*;
 
 public class JokeServer {
 
@@ -22,6 +19,8 @@ public class JokeServer {
   private static final String JOKE_FOUR = "Joke four";
 
   Collection<String> jokes = new ArrayList<>(Arrays.asList(JOKE_ONE, JOKE_TWO, JOKE_THREE, JOKE_FOUR));
+
+  private boolean isJokeMode = false;  // if true = ProverbMode
 
   public static void main(String a[]) throws IOException {
     System.out.println("This is a partial version!");
@@ -78,6 +77,14 @@ class JokeWorker extends Thread {
     ArrayList<String> jokeList = (ArrayList<String>) jokes;
     String joke = jokeList.get(idx);
     out.println(joke);
+  }
+
+  private void parseMessage(String message) {
+
+  }
+
+  private Map<UUID, boolean[]> mapUUIDtoState(UUID uuid, boolean[] arr) {
+    return null;
   }
 
   // Makes portable for 128 bit format

@@ -2,8 +2,13 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousSocketChannel;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 public class JokeClient {
 
@@ -30,13 +35,14 @@ public class JokeClient {
 
     try {
       do {
-        System.out.print("Enter a hostname or an IP address, (quit) to end: ");
+        System.out.print("Enter your name, (quit) to end: ");
         System.out.flush();
         // This will read user input from the keyboard
         // Attempting to read Remote Address of the machine name supplied
         machineName = in.readLine();
         if (machineName.indexOf("quit") < 0) {
           getMessage(machineName, serverName, state);
+//          ASyncGetMessage();
         }
       } while (machineName.indexOf("quit") < 0); // Loop until the user wants to exit
       System.out.println("Cancelled by user request.");
@@ -76,6 +82,32 @@ public class JokeClient {
     } catch (IOException e) {
       System.out.println("Socket error.");
       e.printStackTrace();
+    }
+  }
+  static void ASyncGetMessage() {
+    String hostname = "127.0.0.1"; // localhost default
+    try (AsynchronousSocketChannel client =
+                 AsynchronousSocketChannel.open()) {
+      Future<Void> result = client.connect(
+              new InetSocketAddress(hostname, 9001));
+      result.get();
+      String str= "Hello! How are you?";
+      ByteBuffer buffer = ByteBuffer.wrap(str.getBytes());
+      Future<Integer> writeval = client.write(buffer);
+      System.out.println("Writing to server: "+str);
+      writeval.get();
+      buffer.flip();
+      Future<Integer> readval = client.read(buffer);
+      System.out.println("Received from server: "
+              +new String(buffer.array()).trim());
+      readval.get();
+      buffer.clear();
+    }
+    catch (ExecutionException | IOException e) {
+      e.printStackTrace();
+    }
+    catch (InterruptedException e) {
+      System.out.println("Disconnected from the server.");
     }
   }
 }

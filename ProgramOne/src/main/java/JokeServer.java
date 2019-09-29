@@ -118,17 +118,17 @@ class AdminWorker extends Thread {
 
 class JokeProverbWorker extends Thread {
 
-  private static final String PROVERB_ONE = "Proverb one";
-  private static final String PROVERB_TWO = "Proverb two";
-  private static final String PROVERB_THREE = "Proverb three";
-  private static final String PROVERB_FOUR = "Proverb four";
+  private static final String PROVERB_ONE = "Human behavior flows from three main sources: desire, emotion, and knowledge.  - Plato";
+  private static final String PROVERB_TWO = "Success depends upon previous preparation, and without such preparation, there is sure to be failure.  - Confucius";
+  private static final String PROVERB_THREE = "Let your plans be dark and impenetrable as night, and when you move, fall like a thunderbolt.  - Sun Tzu";
+  private static final String PROVERB_FOUR = "It is the mark of an educated man to be able to entertain a thought without accepting it.  - Aristotle";
 
   private static final Collection<String> PROVERBS = new ArrayList<>(Arrays.asList(PROVERB_ONE, PROVERB_TWO, PROVERB_THREE, PROVERB_FOUR));
 
-  private static final String JOKE_ONE = "Joke one";
-  private static final String JOKE_TWO = "Joke two";
-  private static final String JOKE_THREE = "Joke three";
-  private static final String JOKE_FOUR = "Jokefour";
+  private static final String JOKE_ONE = "What’s a pirates favorite letter?  You think it’s R but it be the C.";
+  private static final String JOKE_TWO = "Time flies like an arrow, fruit flies like banana.";
+  private static final String JOKE_THREE = "I have 3 kids and no money, why I can’t I have no kids and 3 money. - Homer Simpson";
+  private static final String JOKE_FOUR = "I looked up my family tree and found out I was the sap.  – Rodney Dangerfield";
 
   private static final Collection<String> JOKES = new ArrayList<>(Arrays.asList(JOKE_ONE, JOKE_TWO, JOKE_THREE, JOKE_FOUR));
 

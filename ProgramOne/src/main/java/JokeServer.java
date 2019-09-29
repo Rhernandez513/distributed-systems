@@ -118,17 +118,17 @@ class AdminWorker extends Thread {
 
 class JokeProverbWorker extends Thread {
 
-  private static final String PROVERB_ONE = "PA: Proverb one";
-  private static final String PROVERB_TWO = "PB: Proverb two";
-  private static final String PROVERB_THREE = "PC: Proverb three";
-  private static final String PROVERB_FOUR = "PD: Proverb four";
+  private static final String PROVERB_ONE = "Proverb one";
+  private static final String PROVERB_TWO = "Proverb two";
+  private static final String PROVERB_THREE = "Proverb three";
+  private static final String PROVERB_FOUR = "Proverb four";
 
   private static final Collection<String> PROVERBS = new ArrayList<>(Arrays.asList(PROVERB_ONE, PROVERB_TWO, PROVERB_THREE, PROVERB_FOUR));
 
-  private static final String JOKE_ONE = "JA: Joke one";
-  private static final String JOKE_TWO = "JB: Joke two";
-  private static final String JOKE_THREE = "JC: Joke three";
-  private static final String JOKE_FOUR = "JD: Jokefour";
+  private static final String JOKE_ONE = "Joke one";
+  private static final String JOKE_TWO = "Joke two";
+  private static final String JOKE_THREE = "Joke three";
+  private static final String JOKE_FOUR = "Jokefour";
 
   private static final Collection<String> JOKES = new ArrayList<>(Arrays.asList(JOKE_ONE, JOKE_TWO, JOKE_THREE, JOKE_FOUR));
 
@@ -173,20 +173,27 @@ class JokeProverbWorker extends Thread {
 
   // Careful using newlines here, at present the client is only reading the first line
   private void reciteProverb(String name, PrintStream out, Collection<String> proverbs, boolean[] state) {
+
+    ArrayList<String> prefixes = new ArrayList<>(Arrays.asList("PA", "PB", "PC", "PD"));
     Random rand = new Random(System .currentTimeMillis()); // Could look into ThreadLocalRandom when converting to ASync
     int idx = rand.nextInt(4);
+
     ArrayList<String> proverbList = (ArrayList<String>) proverbs;
     String proverb = proverbList.get(idx);
-    out.println("Client name: " + name + ". " + proverb);
+
+    out.println(prefixes.get(idx) + " " + name + " " + proverb);
   }
 
   // Careful using newlines here, at present the client is only reading the first line
   private void tellJoke(String name, PrintStream out, Collection<String> jokes, boolean[] state) {
+
+    ArrayList<String> prefixes = new ArrayList<>(Arrays.asList("JA", "JB", "JC", "JD"));
     Random rand = new Random(System .currentTimeMillis()); // Could look into ThreadLocalRandom when converting to ASync
     int idx = rand.nextInt(4);
+
     ArrayList<String> jokeList = (ArrayList<String>) jokes;
     String joke = jokeList.get(idx);
-    out.println("Client name: " + name + ". " + joke);
+    out.println(prefixes.get(idx) + " " + name + " " + joke);
   }
 
   // Makes portable for 128 bit format

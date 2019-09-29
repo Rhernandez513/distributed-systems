@@ -10,7 +10,8 @@ public class JokeClient {
   private static final UUID _UUID = UUID.randomUUID();
 
   // We define a constant in the java style
-  private static final int PORT = 9001; // it's over 9000!
+  private static final int PORT = 4545; // it's over 9000!
+  private static final int SECONDARY_PORT = 4546;
 
   public static void main(String args[]) {
 
@@ -61,14 +62,10 @@ public class JokeClient {
       final String messsage = "UUID: " + _UUID + ";STATE: " + state + ";";
       toServer.println(messsage);
       toServer.flush(); // don't put two statements on one line
-      // Read three lines of response from the server, and block while synchronously waiting:
-      for (int i = 1; i <= 3; i++) {
-        // Don't assign vars inside loops if we can help it
-        textFromServer = fromServer.readLine();
-        // ALWAYS use brackets
-        if (textFromServer != null) {
-          System.out.println(textFromServer);
-        }
+      // Read a single line from server and block while waiting
+      textFromServer = fromServer.readLine();
+      if (textFromServer != null) {
+        System.out.println(textFromServer);
       }
       // Here we close the external resource we acquired
       sock.close();

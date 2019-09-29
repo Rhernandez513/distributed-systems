@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class JokeServer {
 
@@ -15,18 +16,12 @@ public class JokeServer {
   // readability
 
   private static final int Q_LENGTH = 6; /* Number of requests for OpSys to queue */
-  private static final int CLIENT_PORT = 9001; // it's over 9000!
+  private static final int CLIENT_PORT = 4545;
+  private static final int CLIENT_SECONDARY_PORT = 4546;
   private static final int ADMIN_PORT = 5050;
+  private static final int ADMIN_SECONDARY_PORT = 5051;
 
-  private static final String JOKE_ONE = "Joke one";
-  private static final String JOKE_TWO = "Joke two";
-  private static final String JOKE_THREE = "Joke three";
-  private static final String JOKE_FOUR = "Joke four";
-
-  Collection<String> jokes =
-      new ArrayList<>(Arrays.asList(JOKE_ONE, JOKE_TWO, JOKE_THREE, JOKE_FOUR));
-
-  static volatile Boolean jokeMode = true; // if true = JokeMode
+  static volatile Flag jokeModeFlag = new Flag();
 
   public static void main(String a[]) throws IOException {
 
@@ -56,8 +51,25 @@ public class JokeServer {
     while (true) {
       // this will block until a connection is accepted and then spawn a new thread
       // .start() will spawn a new thread and then call .run()
-      new JokeWorker(servsock.accept()).start();
+      new JokeProverbWorker(servsock.accept()).start();
     }
+  }
+}
+
+// Allegedly a thread-safe way to toggle an AtomicBoolean
+// from The CERT Oracle Secure Coding Standard for Java
+// https://books.google.de/books?id=FDun60sHwUgC&pg=PA314&lpg=PA314&dq=atomicboolean+toggle&source=bl&ots=_hZ-lOC6AW&sig=WnYDRP1GsUKsLJNxn6F3Ef5ty9Q&hl=de&sa=X&ved=0ahUKEwjIurG68ejXAhUO_aQKHbsSAvcQ6AEIVzAG#v=onepage&q=atomicboolean%20toggle&f=false
+final class Flag {
+  private AtomicBoolean flag = new AtomicBoolean(true);
+  // Don't think this one needs to be synchronized because we are synchronizing at the above level and the object is marked as volatile
+  public void toggle() {
+    boolean temp;
+    do {
+      temp = flag.get();
+    } while(!flag.compareAndSet(temp, !temp));
+  }
+  public AtomicBoolean getFlag() {
+    return flag;
   }
 }
 
@@ -70,8 +82,8 @@ class AdminWorker extends Thread {
   }
 
   private synchronized void toggle() {
-    System.out.println((JokeServer.jokeMode.booleanValue()) ? "Entering Proverb Mode" : "Entering Joke Mode");
-    JokeServer.jokeMode = !JokeServer.jokeMode.booleanValue();
+    System.out.println((JokeServer.jokeModeFlag.getFlag().get()) ? "Entering Proverb Mode" : "Entering Joke Mode");
+    JokeServer.jokeModeFlag.toggle();
   }
 
   private synchronized void shutDownJokeServer() {
@@ -99,18 +111,26 @@ class AdminWorker extends Thread {
   }
 }
 
-class JokeWorker extends Thread {
 
-  private static final String JOKE_ONE = "Joke one";
-  private static final String JOKE_TWO = "Joke two";
-  private static final String JOKE_THREE = "Joke three";
-  private static final String JOKE_FOUR = "Joke four";
+class JokeProverbWorker extends Thread {
+
+  private static final String PROVERB_ONE = "PA: Proverb one";
+  private static final String PROVERB_TWO = "PB: Proverb two";
+  private static final String PROVERB_THREE = "PC: Proverb three";
+  private static final String PROVERB_FOUR = "PD: Proverb four";
+
+  private static final Collection<String> PROVERBS = new ArrayList<>(Arrays.asList(PROVERB_ONE, PROVERB_TWO, PROVERB_THREE, PROVERB_FOUR));
+
+  private static final String JOKE_ONE = "JA: Joke one";
+  private static final String JOKE_TWO = "JB: Joke two";
+  private static final String JOKE_THREE = "JC: Joke three";
+  private static final String JOKE_FOUR = "JD: Jokefour";
 
   private static final Collection<String> JOKES = new ArrayList<>(Arrays.asList(JOKE_ONE, JOKE_TWO, JOKE_THREE, JOKE_FOUR));
 
   private Socket sock;
 
-  JokeWorker(Socket s) {
+  JokeProverbWorker(Socket s) {
     sock = s;
   }
 
@@ -122,7 +142,11 @@ class JokeWorker extends Thread {
       outStream = new PrintStream(sock.getOutputStream());
       try {
         String name = in.readLine();
-        tellJoke(name, outStream, JOKES);
+        if (JokeServer.jokeModeFlag.getFlag().get()) {
+          tellJoke(name, outStream, JOKES);
+        } else {
+          reciteProverb(name, outStream, PROVERBS);
+        }
       } catch (IOException e) {
         System.out.println("Server read error");
         e.printStackTrace();
@@ -131,6 +155,14 @@ class JokeWorker extends Thread {
     } catch (IOException e) {
       System.out.println(e);
     }
+  }
+
+  private void reciteProverb(String name, PrintStream out, Collection<String> proverbs) {
+    Random rand = new Random(System .currentTimeMillis()); // Could look into ThreadLocalRandom when converting to ASync
+    int idx = rand.nextInt(4);
+    ArrayList<String> proverbList = (ArrayList<String>) proverbs;
+    String proverb = proverbList.get(idx);
+    out.println(proverb);
   }
 
   private void tellJoke(String name, PrintStream out, Collection<String> jokes) {

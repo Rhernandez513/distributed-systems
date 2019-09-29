@@ -7,8 +7,12 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class JokeServer {
 
@@ -128,6 +132,7 @@ class JokeProverbWorker extends Thread {
 
   private static final Collection<String> JOKES = new ArrayList<>(Arrays.asList(JOKE_ONE, JOKE_TWO, JOKE_THREE, JOKE_FOUR));
 
+  private volatile AtomicReference<String> clientUserName = new AtomicReference<String>();
   private Socket sock;
 
   JokeProverbWorker(Socket s) {
@@ -141,11 +146,13 @@ class JokeProverbWorker extends Thread {
       in = new BufferedReader(new InputStreamReader(sock.getInputStream()));
       outStream = new PrintStream(sock.getOutputStream());
       try {
-        String name = in.readLine();
+        String clientResponse = in.readLine();
         if (JokeServer.jokeModeFlag.getFlag().get()) {
-          tellJoke(name, outStream, JOKES);
+          boolean[] state = parseClientNameAndState(clientResponse);
+          tellJoke(clientUserName.get(), outStream, JOKES, state);
         } else {
-          reciteProverb(name, outStream, PROVERBS);
+          boolean[] state = parseClientNameAndState(clientResponse);
+          reciteProverb(clientUserName.get(), outStream, PROVERBS, state);
         }
       } catch (IOException e) {
         System.out.println("Server read error");
@@ -157,20 +164,29 @@ class JokeProverbWorker extends Thread {
     }
   }
 
-  private void reciteProverb(String name, PrintStream out, Collection<String> proverbs) {
+  private boolean[] parseClientNameAndState(String messageToParse) {
+    final String name = "Bob"; // will be from parsing later
+    // FOO do the parsing
+    clientUserName.set(name);
+    return new boolean[] {false, false, false, false};
+  }
+
+  // Careful using newlines here, at present the client is only reading the first line
+  private void reciteProverb(String name, PrintStream out, Collection<String> proverbs, boolean[] state) {
     Random rand = new Random(System .currentTimeMillis()); // Could look into ThreadLocalRandom when converting to ASync
     int idx = rand.nextInt(4);
     ArrayList<String> proverbList = (ArrayList<String>) proverbs;
     String proverb = proverbList.get(idx);
-    out.println(proverb);
+    out.println("Client name: " + name + ". " + proverb);
   }
 
-  private void tellJoke(String name, PrintStream out, Collection<String> jokes) {
+  // Careful using newlines here, at present the client is only reading the first line
+  private void tellJoke(String name, PrintStream out, Collection<String> jokes, boolean[] state) {
     Random rand = new Random(System .currentTimeMillis()); // Could look into ThreadLocalRandom when converting to ASync
     int idx = rand.nextInt(4);
     ArrayList<String> jokeList = (ArrayList<String>) jokes;
     String joke = jokeList.get(idx);
-    out.println(joke);
+    out.println("Client name: " + name + ". " + joke);
   }
 
   // Makes portable for 128 bit format

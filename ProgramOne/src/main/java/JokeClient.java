@@ -19,7 +19,7 @@ public class JokeClient {
 
     boolean [] state = { false, false, false, false } ;
 
-    String machineName;
+    String userName = "";
 
     // These variables do not change over the  course of execution so they are assigned to final
     // serverName was previously set as an if with no brackets, a bad idea in my eyes
@@ -30,16 +30,27 @@ public class JokeClient {
     System.out.println("Using server: " + serverName + ", Port: " + PORT);
 
     try {
+      String prompt;
+      String userInput = "";
+      boolean first_run = true;
       do {
-        System.out.print("Enter your name, (quit) to end: ");
-        System.out.flush();
-        // This will read user input from the keyboard
-        // Attempting to read Remote Address of the machine name supplied
-        machineName = in.readLine();
-        if (machineName.indexOf("quit") < 0) {
-          getMessage(machineName, serverName, state);
+        if (first_run) {
+          prompt = "Enter your name, (quit) to end: ";
+        } else {
+          prompt = "Press return to get another message, (quit) to end: ";
         }
-      } while (machineName.indexOf("quit") < 0); // Loop until the user wants to exit
+        System.out.print(prompt);
+        System.out.flush();
+        if (first_run) {
+          userName = in.readLine();
+          first_run = false;
+        } else {
+          userInput = in.readLine();
+        }
+        if (userInput.indexOf("quit") < 0) {
+          getMessage(userName, serverName, state);
+        }
+      } while (userName.indexOf("quit") < 0); // Loop until the user wants to exit
       System.out.println("Cancelled by user request.");
     } catch (IOException e) {
       e.printStackTrace();
@@ -59,8 +70,9 @@ public class JokeClient {
       BufferedReader fromServer = new BufferedReader(new InputStreamReader(sock.getInputStream()));
       PrintStream toServer = new PrintStream(sock.getOutputStream());
       // Send hostname or IP to server
-      final String messsage = "UUID: " + _UUID + ";STATE: " + state + ";";
-      toServer.println(messsage);
+//      final String message = "UUID: " + _UUID + ";STATE: " + state + ";";
+      final String message = "NAME: " + name + ";STATE: " + state + ";";
+      toServer.println(message);
       toServer.flush(); // don't put two statements on one line
       // Read a single line from server and block while waiting
       textFromServer = fromServer.readLine();

@@ -1,19 +1,13 @@
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.channels.AsynchronousSocketChannel;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
+import java.io.PrintStream;
+import java.net.ConnectException;
+import java.net.Socket;
 
 public class JokeServerAdmin {
   // We define a constant in the java style
-  private static final int PORT = 9002; // it's over 9000!
-
-  void toggleServer(String ipAddress) {
-
-  }
+  private static final int PORT = 5050;
 
   public static void main(String args[]) {
     System.out.println("This is a partial version!");
@@ -37,11 +31,10 @@ public class JokeServerAdmin {
         // This will read user input from the keyboard
         // Attempting to read Remote Address of the machine name supplied
         machineName = in.readLine();
-        if (machineName.equals("shutdown") || machineName.equals("shutdown\n")) {
-          ASyncShutdown();
-        }
-        if (machineName.indexOf("quit") < 0) {
-          ASyncToggle();
+        if (machineName.equals("shutdown")) {
+          sendMessage("shutdown", serverName);
+        } else {
+          sendMessage("toggle", serverName);
         }
       } while (machineName.indexOf("quit") < 0); // Loop until the user wants to exit
       System.out.println("Cancelled by user request.");
@@ -49,57 +42,22 @@ public class JokeServerAdmin {
       e.printStackTrace();
     }
   }
-  static void ASyncShutdown() {
-    try {
-      AsynchronousSocketChannel client = AsynchronousSocketChannel.open();
-      Future<Void> result = client.connect( new InetSocketAddress("127.0.0.1", PORT));
-      result.get();
-//      String str= "Hello! How are you?";
-      String str= "shutdown";
-      ByteBuffer buffer = ByteBuffer.wrap(str.getBytes());
-      Future<Integer> writeval = client.write(buffer);
-      System.out.println("Writing to server: "+str);
-      writeval.get();
-      buffer.flip();
-      Future<Integer> readval = client.read(buffer);
-      System.out.println("Received from server: " +new String(buffer.array()).trim());
-      readval.get();
-      buffer.clear();
-      client.close();
-    }
-    catch (ExecutionException | IOException e) {
-      // This is expected with client.close();
-//      e.printStackTrace();
-    }
-    catch (InterruptedException e) {
-      System.out.println("Disconnected from the server.");
-    }
-  }
 
-  static void ASyncToggle() {
+  static void sendMessage(String payload, String serverName) {
     try {
-      AsynchronousSocketChannel client = AsynchronousSocketChannel.open();
-      Future<Void> result = client.connect( new InetSocketAddress("127.0.0.1", PORT));
-      result.get();
-      String str= "Hello! How are you?";
-      ByteBuffer buffer = ByteBuffer.wrap(str.getBytes());
-      Future<Integer> writeval = client.write(buffer);
-      System.out.println("Writing to server: "+str);
-      writeval.get();
-      buffer.flip();
-      Future<Integer> readval = client.read(buffer);
-      System.out.println("Received from server: "
-              +new String(buffer.array()).trim());
-      readval.get();
-      buffer.clear();
-      client.close();
-    }
-    catch (ExecutionException | IOException e) {
-      // This is expected with client.close();
-//      e.printStackTrace();
-    }
-    catch (InterruptedException e) {
-      System.out.println("Disconnected from the server.");
+      Socket sock = new Socket(serverName, PORT);
+      // Create IO streams for the socket
+      PrintStream toServer = new PrintStream(sock.getOutputStream());
+      toServer.println(payload);
+      toServer.flush();
+      // We do not attempt to read a response from the server, we "fire and forget"
+      // Here we close the external resource we acquired
+      sock.close();
+    } catch (ConnectException e) {
+      // Sometimes we see this on one "quit" even though it works fine
+    } catch (IOException e) {
+      System.out.println("Socket error.");
+      e.printStackTrace();
     }
   }
 }

@@ -2,13 +2,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
-import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.nio.ByteBuffer;
-import java.nio.channels.AsynchronousSocketChannel;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 public class JokeClient {
 
@@ -42,7 +37,6 @@ public class JokeClient {
         machineName = in.readLine();
         if (machineName.indexOf("quit") < 0) {
           getMessage(machineName, serverName, state);
-//          ASyncGetMessage();
         }
       } while (machineName.indexOf("quit") < 0); // Loop until the user wants to exit
       System.out.println("Cancelled by user request.");
@@ -65,7 +59,6 @@ public class JokeClient {
       PrintStream toServer = new PrintStream(sock.getOutputStream());
       // Send hostname or IP to server
       final String messsage = "UUID: " + _UUID + ";STATE: " + state + ";";
-//      toServer.println(name);
       toServer.println(messsage);
       toServer.flush(); // don't put two statements on one line
       // Read three lines of response from the server, and block while synchronously waiting:
@@ -82,32 +75,6 @@ public class JokeClient {
     } catch (IOException e) {
       System.out.println("Socket error.");
       e.printStackTrace();
-    }
-  }
-  static void ASyncGetMessage() {
-    String hostname = "127.0.0.1"; // localhost default
-    try (AsynchronousSocketChannel client =
-                 AsynchronousSocketChannel.open()) {
-      Future<Void> result = client.connect(
-              new InetSocketAddress(hostname, 9001));
-      result.get();
-      String str= "Hello! How are you?";
-      ByteBuffer buffer = ByteBuffer.wrap(str.getBytes());
-      Future<Integer> writeval = client.write(buffer);
-      System.out.println("Writing to server: "+str);
-      writeval.get();
-      buffer.flip();
-      Future<Integer> readval = client.read(buffer);
-      System.out.println("Received from server: "
-              +new String(buffer.array()).trim());
-      readval.get();
-      buffer.clear();
-    }
-    catch (ExecutionException | IOException e) {
-      e.printStackTrace();
-    }
-    catch (InterruptedException e) {
-      System.out.println("Disconnected from the server.");
     }
   }
 }

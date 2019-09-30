@@ -35,7 +35,7 @@ public class JokeClient {
         if (first_run) {
           prompt = "Enter your name, (quit) to end: ";
         } else {
-          prompt = "Press return to get another message, (quit) to end: ";
+          prompt = "Press return to get another message (if the Server just switched modest , you might have to press Return twice), (quit) to end: ";
         }
         System.out.print(prompt);
         System.out.flush();
@@ -48,8 +48,8 @@ public class JokeClient {
         if (userInput.indexOf("quit") < 0) {
           getMessage(userName, serverName);
         }
-      } while (userName.indexOf("quit") < 0); // Loop until the user wants to exit
-      System.out.println("Cancelled by user request.");
+      } while (userName.indexOf("quit") < 0 && userInput.indexOf("quit") < 0); // Loop until the user wants to exit
+    System.out.println("Cancelled by user request.");
     } catch (IOException e) {
       e.printStackTrace();
     }

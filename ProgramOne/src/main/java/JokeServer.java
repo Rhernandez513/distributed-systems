@@ -1,3 +1,5 @@
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -9,8 +11,11 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+import java.util.Stack;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -33,25 +38,34 @@ public class JokeServer {
 
     System.out.println("This is a partial version!");
 
-    System.out.println("Robert David's Joke Server 1.8 starting up, listening on admin port " + ADMIN_PORT + "\n");
-    // I tried my best to use a ASyncSocketChannel but couldn't get it to work using 2 ports, only 1 port
-    // I will probably try again next time around.  I was having issue interrupting threads, and running out of memory from creating
-    // multiple threads.  I tried a few ways to limit the amount of threads spawning, but it didn't alleviate the earlier issues
-    Thread adminLoopThread = new Thread( () -> {
-      System.out.println("In the admin looper thread");
-       try (ServerSocket adminServSock = new ServerSocket(ADMIN_PORT, Q_LENGTH)) {
-         while (adminControlSwitch) {
-           // wait for the next ADMIN client connection:
-           new AdminWorker(adminServSock.accept()).start();
-         }
-       } catch (IOException ioe) {
-         System.out.println(ioe);
-       }
-     });
+    System.out.println(
+        "Robert David's Joke Server 1.8 starting up, listening on admin port " + ADMIN_PORT + "\n");
+    // I tried my best to use a ASyncSocketChannel but couldn't get it to work using 2 ports, only 1
+    // port
+    // I will probably try again next time around.  I was having issue interrupting threads, and
+    // running out of memory from creating
+    // multiple threads.  I tried a few ways to limit the amount of threads spawning, but it didn't
+    // alleviate the earlier issues
+    Thread adminLoopThread =
+        new Thread(
+            () -> {
+              System.out.println("In the admin looper thread");
+              try (ServerSocket adminServSock = new ServerSocket(ADMIN_PORT, Q_LENGTH)) {
+                while (adminControlSwitch) {
+                  // wait for the next ADMIN client connection:
+                  new AdminWorker(adminServSock.accept()).start();
+                }
+              } catch (IOException ioe) {
+                System.out.println(ioe);
+              }
+            });
     adminLoopThread.start();
 
     ServerSocket servsock = new ServerSocket(CLIENT_PORT, Q_LENGTH);
-    System.out.println( "Robert David's Joke Server 1.8 starting up, listening on client port " + CLIENT_PORT + "\n");
+    System.out.println(
+        "Robert David's Joke Server 1.8 starting up, listening on client port "
+            + CLIENT_PORT
+            + "\n");
     while (true) {
       // this will block until a connection is accepted and then spawn a new thread
       // .start() will spawn a new thread and then call .run()
@@ -65,13 +79,15 @@ public class JokeServer {
 // https://books.google.de/books?id=FDun60sHwUgC&pg=PA314&lpg=PA314&dq=atomicboolean+toggle&source=bl&ots=_hZ-lOC6AW&sig=WnYDRP1GsUKsLJNxn6F3Ef5ty9Q&hl=de&sa=X&ved=0ahUKEwjIurG68ejXAhUO_aQKHbsSAvcQ6AEIVzAG#v=onepage&q=atomicboolean%20toggle&f=false
 final class Flag {
   private AtomicBoolean flag = new AtomicBoolean(true);
-  // Don't think this one needs to be synchronized because we are synchronizing at the above level and the object is marked as volatile
+  // Don't think this one needs to be synchronized because we are synchronizing at the above level
+  // and the object is marked as volatile
   public void toggle() {
     boolean temp;
     do {
       temp = flag.get();
-    } while(!flag.compareAndSet(temp, !temp));
+    } while (!flag.compareAndSet(temp, !temp));
   }
+
   public AtomicBoolean getFlag() {
     return flag;
   }
@@ -86,7 +102,8 @@ class AdminWorker extends Thread {
   }
 
   private synchronized void toggle() {
-    System.out.println((JokeServer.jokeModeFlag.getFlag().get()) ? "Entering Proverb Mode" : "Entering Joke Mode");
+    System.out.println(
+        (JokeServer.jokeModeFlag.getFlag().get()) ? "Entering Proverb Mode" : "Entering Joke Mode");
     JokeServer.jokeModeFlag.toggle();
   }
 
@@ -96,7 +113,8 @@ class AdminWorker extends Thread {
   }
 
   public void run() {
-    try (BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()))){
+    try (BufferedReader input =
+        new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
       try {
         String name = input.readLine().trim();
         if (name.equals("shutdown")) {
@@ -114,7 +132,6 @@ class AdminWorker extends Thread {
     }
   }
 }
-
 
 class JokeProverbWorker extends Thread {
 
@@ -164,31 +181,102 @@ class JokeProverbWorker extends Thread {
     }
   }
 
+  private static boolean[] deSerializeState(String state) {
+    boolean[] stateAsBools = new boolean[4];
+    String[] content = state.trim().split(",");
+
+    for(int i = 0; i < stateAsBools.length; ++i) {
+      if (content[i].equals("true")) {
+        stateAsBools[i] = true;
+      } else {
+        stateAsBools[i] = false;
+      }
+    }
+    return stateAsBools;
+  }
+
   private boolean[] parseClientNameAndState(String messageToParse) {
-    final String name = "Bob"; // will be from parsing later
-    // FOO do the parsing
-    clientUserName.set(name);
-    return new boolean[] {false, false, false, false};
+    String[] content = messageToParse.split(";");
+    clientUserName.set(content[0].trim());
+    return deSerializeState(content[1].trim());
+  }
+
+  // This will take a cookie from an individual client
+  // and determine which indexes are false AKA have not been used yet
+  private static Set<Integer> analyzeState(boolean[] state) {
+    Set<Integer> workableIndexes = new HashSet<>();
+
+    for (int i = 0; i < state.length; ++i) {
+      if (state[i] == false) {
+        workableIndexes.add(i);
+      }
+    }
+
+    if (workableIndexes.size() == 0) {
+      // All of the jokes or proverbs have been used up already
+      return null;
+    }
+    return workableIndexes;
   }
 
   // Careful using newlines here, at present the client is only reading the first line
-  private void reciteProverb(String name, PrintStream out, Collection<String> proverbs, boolean[] state) {
+  private static void  reciteProverb(String name, PrintStream out, Collection<String> proverbs, boolean[] state) {
 
     ArrayList<String> prefixes = new ArrayList<>(Arrays.asList("PA", "PB", "PC", "PD"));
-    Random rand = new Random(System .currentTimeMillis()); // Could look into ThreadLocalRandom when converting to ASync
+    Random rand = new Random( System .currentTimeMillis()); // Could look into ThreadLocalRandom when converting to ASync
+
+    // We start with getting any random number
     int idx = rand.nextInt(4);
+
+    // TODO determine which joke or proverb we can use
+    // We want to pinpoint a potential index of the state array that hasn't been used yet
+    // All of the potential proverbs have been used up, lets reset the state
+    Set<Integer> indexesToUse = analyzeState(state);
+    if (indexesToUse == null) {
+      System.out.println("PROVERB CYCLE COMPLETED");
+      state = new boolean[] {false, false, false, false};
+    } else {
+      while (!indexesToUse.contains(idx)) {
+        idx = rand.nextInt(4);
+      }
+    }
 
     ArrayList<String> proverbList = (ArrayList<String>) proverbs;
     String proverb = proverbList.get(idx);
 
+    // Here we set the reported proverb index to true so it wont be repeated
+    state[idx] = true;
+
+    // Here we check if we have seen all of the proverbs
+    boolean all_done_flag = true;
+    for (boolean b : state) {
+      if (b == false) {
+        all_done_flag = false;
+      }
+    }
+    if (all_done_flag) {
+      System.out.println("PROVERB CYCLE COMPLETED");
+    }
+
+    // Send the message w/ updated state back to the client
+    String stateUpdateMessage = "STATE: ";
+    for(boolean a : state) {
+      stateUpdateMessage += a + ", ";
+    }
+    out.println(stateUpdateMessage.substring(0, stateUpdateMessage.length() - 2));
+
+    // Send the actual proverb
     out.println(prefixes.get(idx) + " " + name + " " + proverb);
   }
 
   // Careful using newlines here, at present the client is only reading the first line
-  private void tellJoke(String name, PrintStream out, Collection<String> jokes, boolean[] state) {
+  private static void tellJoke(String name, PrintStream out, Collection<String> jokes, boolean[] state) {
 
     ArrayList<String> prefixes = new ArrayList<>(Arrays.asList("JA", "JB", "JC", "JD"));
-    Random rand = new Random(System .currentTimeMillis()); // Could look into ThreadLocalRandom when converting to ASync
+    Random rand =
+        new Random(
+            System
+                .currentTimeMillis()); // Could look into ThreadLocalRandom when converting to ASync
     int idx = rand.nextInt(4);
 
     ArrayList<String> jokeList = (ArrayList<String>) jokes;

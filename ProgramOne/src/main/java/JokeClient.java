@@ -7,17 +7,15 @@ import java.util.UUID;
 
 public class JokeClient {
 
-  private static final UUID _UUID = UUID.randomUUID();
-
   // We define a constant in the java style
   private static final int PORT = 4545; // it's over 9000!
   private static final int SECONDARY_PORT = 4546;
 
+  private static boolean [] state = { false, false, false, false } ;
+
   public static void main(String args[]) {
 
     System.out.println("This is a partial version!");
-
-    boolean [] state = { false, false, false, false } ;
 
     String userName = "";
 
@@ -48,7 +46,7 @@ public class JokeClient {
           userInput = in.readLine();
         }
         if (userInput.indexOf("quit") < 0) {
-          getMessage(userName, serverName, state);
+          getMessage(userName, serverName);
         }
       } while (userName.indexOf("quit") < 0); // Loop until the user wants to exit
       System.out.println("Cancelled by user request.");
@@ -60,7 +58,7 @@ public class JokeClient {
   // this function will call out to the remote host "serverName" and ask that
   // host to scan the local network for the provided "machineName"
   // printing the result of the communication to the console
-  static void getMessage(String name, String serverName, boolean [] state) {
+  static void getMessage(String name, String serverName) {
     String textFromServer;
 
     try {
@@ -69,14 +67,22 @@ public class JokeClient {
       // Create IO streams for the socket
       BufferedReader fromServer = new BufferedReader(new InputStreamReader(sock.getInputStream()));
       PrintStream toServer = new PrintStream(sock.getOutputStream());
-      // Send hostname or IP to server
-//      final String message = "UUID: " + _UUID + ";STATE: " + state + ";";
-      final String message = "NAME: " + name + ";STATE: " + state + ";";
+
+      final String message = name + ";" + serializeState(state);
       toServer.println(message);
       toServer.flush(); // don't put two statements on one line
-      // Read a single line from server and block while waiting
-      textFromServer = fromServer.readLine();
-      if (textFromServer != null) {
+      // Read two lines from server and block while waiting
+      for(int i = 0; i < 3; ++i) {
+        textFromServer = fromServer.readLine();
+        if (textFromServer == null) {
+          // End of output from server
+          break;
+        } else if (textFromServer.startsWith("STATE: ")) {
+          boolean[] returnedState = deSerializeState(textFromServer);
+          JokeClient.state = returnedState;
+          continue; // we avoid printing state to the console for now
+        }
+        // We print out the message that isn't state related
         System.out.println(textFromServer);
       }
       // Here we close the external resource we acquired
@@ -85,5 +91,35 @@ public class JokeClient {
       System.out.println("Socket error.");
       e.printStackTrace();
     }
+  }
+  static String serializeState(boolean[] state) {
+    String stateAsString = "";
+    for(boolean b : state) {
+      if (b) {
+        stateAsString += "true,";
+      } else {
+        stateAsString += "false,";
+      }
+    }
+    return stateAsString;
+  }
+
+  private static boolean[] deSerializeState(String state) {
+    boolean[] stateAsBools = new boolean[4];
+    state = state.substring(7); // Trimming off "STATE: "
+    String[] content = state.trim().split(",");
+
+    for(int i = 0; i < content.length; ++i) {
+      content[i] = content[i].trim();
+    }
+
+    for(int i = 0; i < stateAsBools.length; ++i) {
+      if (content[i].equals("true")) {
+        stateAsBools[i] = true;
+      } else {
+        stateAsBools[i] = false;
+      }
+    }
+    return stateAsBools;
   }
 }

@@ -3,7 +3,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.Socket;
-import java.util.UUID;
 
 public class JokeClient {
 
@@ -11,7 +10,8 @@ public class JokeClient {
   private static final int PORT = 4545; // it's over 9000!
   private static final int SECONDARY_PORT = 4546;
 
-  private static boolean [] state = { false, false, false, false } ;
+  private static boolean [] jokeState = { false, false, false, false } ;
+  private static boolean [] proverbState = { false, false, false, false } ;
 
   public static void main(String args[]) {
 
@@ -60,6 +60,7 @@ public class JokeClient {
   // printing the result of the communication to the console
   static void getMessage(String name, String serverName) {
     String textFromServer;
+    String serverMode = "";
 
     try {
       // these vars can be declared and initialized in one line each
@@ -68,18 +69,25 @@ public class JokeClient {
       BufferedReader fromServer = new BufferedReader(new InputStreamReader(sock.getInputStream()));
       PrintStream toServer = new PrintStream(sock.getOutputStream());
 
-      final String message = name + ";" + serializeState(state);
+      final String message = name + ";" + serializeState(jokeState) + ";" + serializeState(proverbState);
       toServer.println(message);
       toServer.flush(); // don't put two statements on one line
-      // Read two lines from server and block while waiting
-      for(int i = 0; i < 3; ++i) {
+      // Read four lines from server and block while waiting
+      for(int i = 0; i < 4; ++i) {
         textFromServer = fromServer.readLine();
         if (textFromServer == null) {
           // End of output from server
           break;
+        } else if (textFromServer.startsWith("MODE: ")) {
+          serverMode = deSerializeMode(textFromServer);
+          continue; // we avoid printing what mode the server is in
         } else if (textFromServer.startsWith("STATE: ")) {
           boolean[] returnedState = deSerializeState(textFromServer);
-          JokeClient.state = returnedState;
+          if (serverMode.equals("JOKE")) {
+            JokeClient.jokeState = returnedState;
+          } else if (serverMode.equals("PROVERB")) {
+            JokeClient.proverbState = returnedState;
+          }
           continue; // we avoid printing state to the console for now
         }
         // We print out the message that isn't state related
@@ -102,6 +110,10 @@ public class JokeClient {
       }
     }
     return stateAsString;
+  }
+
+  private static String deSerializeMode(String mode) {
+    return mode.substring(6); // Trimming off "MODE: "
   }
 
   private static boolean[] deSerializeState(String state) {

@@ -1,5 +1,3 @@
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -9,13 +7,10 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.Stack;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -149,7 +144,7 @@ class JokeProverbWorker extends Thread {
 
   private static final Collection<String> JOKES = new ArrayList<>(Arrays.asList(JOKE_ONE, JOKE_TWO, JOKE_THREE, JOKE_FOUR));
 
-  private volatile AtomicReference<String> clientUserName = new AtomicReference<String>();
+  private volatile AtomicReference<String> clientUserName = new AtomicReference<>();
   private Socket sock;
 
   JokeProverbWorker(Socket s) {
@@ -165,11 +160,13 @@ class JokeProverbWorker extends Thread {
       try {
         String clientResponse = in.readLine();
         if (JokeServer.jokeModeFlag.getFlag().get()) {
-          boolean[] state = parseClientNameAndState(clientResponse);
-          tellJoke(clientUserName.get(), outStream, JOKES, state);
+          List<boolean[]> state = parseClientNameAndState(clientResponse);
+          // IDX of ZERO means Tell a Joke
+          reciteProverbOrTellJoke(clientUserName.get(), outStream, JOKES, state.get(0));
         } else {
-          boolean[] state = parseClientNameAndState(clientResponse);
-          reciteProverb(clientUserName.get(), outStream, PROVERBS, state);
+          // IDX of ONE means Recite a Proverb
+          List<boolean[]> state = parseClientNameAndState(clientResponse);
+          reciteProverbOrTellJoke(clientUserName.get(), outStream, PROVERBS, state.get(1));
         }
       } catch (IOException e) {
         System.out.println("Server read error");
@@ -195,10 +192,14 @@ class JokeProverbWorker extends Thread {
     return stateAsBools;
   }
 
-  private boolean[] parseClientNameAndState(String messageToParse) {
+  private List<boolean[]> parseClientNameAndState(String messageToParse) {
     String[] content = messageToParse.split(";");
     clientUserName.set(content[0].trim());
-    return deSerializeState(content[1].trim());
+
+    boolean[] jokeState = deSerializeState(content[1].trim());
+    boolean[] proverbState = deSerializeState(content[2].trim());
+
+    return new ArrayList<>(Arrays.asList(jokeState, proverbState));
   }
 
   // This will take a cookie from an individual client
@@ -219,23 +220,30 @@ class JokeProverbWorker extends Thread {
     return workableIndexes;
   }
 
-  // Careful using newlines here, at present the client is only reading the first line
-  private static void  reciteProverb(String name, PrintStream out, Collection<String> proverbs, boolean[] state) {
+  private static void reciteProverbOrTellJoke(String name, PrintStream out, Collection<String> proverbs, boolean[] state) {
 
-    ArrayList<String> prefixes = new ArrayList<>(Arrays.asList("PA", "PB", "PC", "PD"));
     Random rand = new Random( System .currentTimeMillis()); // Could look into ThreadLocalRandom when converting to ASync
+
+    ArrayList<String> prefixes;
+
+    if(JokeServer.jokeModeFlag.getFlag().get()) {
+      // We are in Joke Mode
+      prefixes = new ArrayList<>(Arrays.asList("JA", "JB", "JC", "JD"));
+    } else {
+      prefixes = new ArrayList<>(Arrays.asList("PA", "PB", "PC", "PD"));
+    }
 
     // We start with getting any random number
     int idx = rand.nextInt(4);
 
-    // TODO determine which joke or proverb we can use
     // We want to pinpoint a potential index of the state array that hasn't been used yet
-    // All of the potential proverbs have been used up, lets reset the state
     Set<Integer> indexesToUse = analyzeState(state);
+
+    // All of the potential proverbs have been used up, lets reset the state
     if (indexesToUse == null) {
-      System.out.println("PROVERB CYCLE COMPLETED");
       state = new boolean[] {false, false, false, false};
     } else {
+      // If they haven't been used up, lets determine what joke or proverb is good to use
       while (!indexesToUse.contains(idx)) {
         idx = rand.nextInt(4);
       }
@@ -247,7 +255,7 @@ class JokeProverbWorker extends Thread {
     // Here we set the reported proverb index to true so it wont be repeated
     state[idx] = true;
 
-    // Here we check if we have seen all of the proverbs
+    // Here we check if we have seen all of the proverbs or jokes
     boolean all_done_flag = true;
     for (boolean b : state) {
       if (b == false) {
@@ -255,7 +263,11 @@ class JokeProverbWorker extends Thread {
       }
     }
     if (all_done_flag) {
-      System.out.println("PROVERB CYCLE COMPLETED");
+      if (JokeServer.jokeModeFlag.getFlag().get()) {
+        System.out.println("JOKE CYCLE COMPLETED");
+      } else {
+        System.out.println("PROVERB CYCLE COMPLETED");
+      }
     }
 
     // Send the message w/ updated state back to the client
@@ -263,25 +275,21 @@ class JokeProverbWorker extends Thread {
     for(boolean a : state) {
       stateUpdateMessage += a + ", ";
     }
+
+    // Indicate to the client what mode the server is in
+    String modeMessage = "MODE: ";
+    if (JokeServer.jokeModeFlag.getFlag().get()) {
+      modeMessage += "JOKE";
+    } else {
+      modeMessage += "PROVERB";
+    }
+    out.println(modeMessage);
+
+    // Update the clients state, the client will determine what state-mode it needs to update
     out.println(stateUpdateMessage.substring(0, stateUpdateMessage.length() - 2));
 
-    // Send the actual proverb
+    // Send the actual joke or proverb
     out.println(prefixes.get(idx) + " " + name + " " + proverb);
-  }
-
-  // Careful using newlines here, at present the client is only reading the first line
-  private static void tellJoke(String name, PrintStream out, Collection<String> jokes, boolean[] state) {
-
-    ArrayList<String> prefixes = new ArrayList<>(Arrays.asList("JA", "JB", "JC", "JD"));
-    Random rand =
-        new Random(
-            System
-                .currentTimeMillis()); // Could look into ThreadLocalRandom when converting to ASync
-    int idx = rand.nextInt(4);
-
-    ArrayList<String> jokeList = (ArrayList<String>) jokes;
-    String joke = jokeList.get(idx);
-    out.println(prefixes.get(idx) + " " + name + " " + joke);
   }
 
   // Makes portable for 128 bit format

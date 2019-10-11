@@ -30,12 +30,15 @@ class ListenerWorker implements Runnable {
   }
 
   public void run() {
-    try {
-      BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-      String line = input.readLine().trim();
-
-      System.out.println(line);
-
+    try (BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+      String line;
+      do {
+        line = input.readLine();
+        if (line == null) {
+          break;
+        }
+        System.out.println(line.trim());
+      } while (line != null);
     } catch (Exception e) {
       e.printStackTrace();
     }

@@ -1,7 +1,7 @@
 import java.io.File;
 import java.net.URISyntaxException;
 
-public class Solution {
+public class MyWebServer {
   public static void main(String[] args) {
     try {
       System.out.println(getDirectoryOfJAR());
@@ -12,6 +12,6 @@ public class Solution {
 
   // https://stackoverflow.com/a/320595
   private static String getDirectoryOfJAR() throws URISyntaxException {
-    return new File(Solution.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getPath();
+    return new File(MyWebServer.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getPath();
   }
 }

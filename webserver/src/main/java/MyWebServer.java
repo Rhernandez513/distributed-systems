@@ -10,10 +10,8 @@ import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -22,6 +20,8 @@ import java.util.List;
 
 class Constants {
   public static final String EOL = "\r\n";
+  public static final String SECURITY_ERROR_FILE = "security-error.html";
+  public static final String SYSTEM_TIME_FILE = "system-time.html";
 }
 
 public class MyWebServer {
@@ -64,6 +64,9 @@ class WebServerWorker implements Runnable {
           break;
         }
         if (line.startsWith("GET")) {
+          if(line.contains("..")) {
+            line = Constants.SECURITY_ERROR_FILE;
+          }
           ContentType = WebServerFileUtil.determineFileType(line);
           fileContents = WebServerFileUtil.getFileContents(line);
         }
@@ -122,9 +125,34 @@ class WebServerWorker implements Runnable {
 }
 
 class DynamicHTMLGenerator {
+
+  private static synchronized void writeOutFile(String absolutePath, String payload) {
+    try (Writer writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(absolutePath), StandardCharsets.UTF_8))) {
+      writer.write(payload);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  public static void createSecurityErrorFile() {
+    final String fileName = Constants.SECURITY_ERROR_FILE;
+
+    String workingDirectory = null;
+    try {
+      workingDirectory = WebServerFileUtil.getDirectoryOfJAR();
+    } catch (URISyntaxException e) {
+      e.printStackTrace();
+    }
+
+    final String absoluteFilePath = workingDirectory + FileSystems.getDefault().getSeparator() + fileName;
+    final String content = "<h1>ACCESS DENIED.  DIRECTORY TRAVERSAL DISALLOWED.</h1>";
+
+    writeOutFile(absoluteFilePath, buildHTML(content));
+  }
+
   public static void createCurrentTimeFile() {
 
-    final String fileName = "system-time.html";
+    final String fileName = Constants.SYSTEM_TIME_FILE;
     final Timestamp currentTime = new Timestamp(System.currentTimeMillis());
 
     String workingDirectory = null;
@@ -134,19 +162,22 @@ class DynamicHTMLGenerator {
       e.printStackTrace();
     }
 
+    final String absoluteFilePath = workingDirectory + FileSystems.getDefault().getSeparator() + fileName;
+    final String content = "Current Time: " + currentTime  + "<p>";
+
+    writeOutFile(absoluteFilePath, buildHTML(content));
+  }
+  private static String buildHTML(String content) {
+
     StringBuilder builder = new StringBuilder();
+
     builder.append("<html>" + Constants.EOL);
     builder.append("<body>" + Constants.EOL);
-    builder.append("Current Time: " + currentTime  + "<p>" + Constants.EOL);
+    builder.append(content + Constants.EOL);
     builder.append("</body>" + Constants.EOL);
     builder.append("</html>" + Constants.EOL);
 
-    final String absoluteFilePath = workingDirectory + FileSystems.getDefault().getSeparator() + fileName;
-    try (Writer writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(absoluteFilePath), StandardCharsets.UTF_8))) {
-      writer.write(builder.toString());
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
+    return builder.toString();
   }
 }
 
@@ -157,6 +188,10 @@ class WebServerFileUtil {
     final String HTML = "text/html";
     final String PLAINTEXT = "text/plain";
     final String JSON = "application/json";
+
+    if (query.contains(Constants.SECURITY_ERROR_FILE)) {
+      return HTML;
+    }
 
     query = query.split(" ")[1];
     if (query.endsWith(".html")) {
@@ -175,10 +210,18 @@ class WebServerFileUtil {
     String currentPath = null;
     List<String> content = null;
 
-    query = query.trim().split(" ")[1];
-
-    if(query.contains("system-time.html")) {
+    boolean security_flag = false;
+    if(query.contains(Constants.SECURITY_ERROR_FILE)) {
+      DynamicHTMLGenerator.createSecurityErrorFile();
+      security_flag = true;
+    } else if(query.contains(Constants.SYSTEM_TIME_FILE)) {
       DynamicHTMLGenerator.createCurrentTimeFile();
+    }
+
+    if (security_flag == false) {
+      query = query.trim().split(" ")[1];
+    } else {
+      query = FileSystems.getDefault().getSeparator() + query;
     }
 
     try {

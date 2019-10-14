@@ -16,6 +16,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.List;
 
 class Constants {
@@ -56,19 +57,39 @@ class WebServerWorker implements Runnable {
   public void run() {
     try (BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
       String line;
-      List<String> fileContents = null;
+      List<String> fileContents = new ArrayList<>();
       PrintStream outputStream = new PrintStream(socket.getOutputStream(), true);
+
+      boolean directoryFlag = false;
+
       do {
         line = input.readLine();
         if (line == null) {
           break;
         }
+        // Respond to GET request flow
         if (line.startsWith("GET")) {
-          if(line.contains("..")) {
+
+          String queryString = line.split(" ")[1];
+
+          // Security disallowing "jumping" the root dir
+          if(line.contains("..") || line.contains("security-error.html")) {
             line = Constants.SECURITY_ERROR_FILE;
+          } else if (queryString.endsWith("/") || queryString.length() == 1) {
+            // We want to look at a directory
+            directoryFlag = true;
+            String directoryContents = WebServerFileUtil.readAllFilesInDir(queryString);
+            String formattedContents = DynamicHTMLGenerator.createDirectoryListingFile(directoryContents, queryString);
+//            fileContents.add(directoryContents);
+            fileContents.add(formattedContents);
           }
-          ContentType = WebServerFileUtil.determineFileType(line);
-          fileContents = WebServerFileUtil.getFileContents(line);
+
+          if (directoryFlag == false) {
+            // Actions for reading a file
+            ContentType = WebServerFileUtil.determineFileType(line);
+            fileContents = WebServerFileUtil.getFileContents(line);
+          }
+
         }
         System.out.println(line.trim());
       } while (line != null && !line.equals(""));
@@ -126,6 +147,7 @@ class WebServerWorker implements Runnable {
 
 class DynamicHTMLGenerator {
 
+  // Allows for thread safe interaction w/ the filesystem for writing out files
   private static synchronized void writeOutFile(String absolutePath, String payload) {
     try (Writer writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(absolutePath), StandardCharsets.UTF_8))) {
       writer.write(payload);
@@ -134,6 +156,62 @@ class DynamicHTMLGenerator {
     }
   }
 
+  // this function deals with dynamically creating web pages that list files and directories
+  public static String createDirectoryListingFile(String payload, String queryString) {
+
+    String header = "<h3> Index of: " + queryString + "</h3>";
+
+    StringBuilder output = new StringBuilder();
+
+    output.append(header + Constants.EOL);
+
+    final String fileFormatPrefix = "[TXT] <a href=\"";
+    final String fileFormatSuffixOne = "\">";
+    final String fileFormatSuffixTwo = "</a>";
+
+    final String dirFormatPrefix = "[DIR] <a href=\"";
+    final String dirFormatSuffixOne = "\">";
+    final String dirFormatSuffixTwo = "</a>";
+
+    final String[] lines = payload.split(Constants.EOL);
+
+    for (String s : lines) {
+      if (s.contains("File")) {
+        String fileName = s.split(" ")[1];
+        if (fileName.contains(".class")) {
+          // Exclude compiled java bytecode
+          continue;
+        }
+        // Exclude data info from href
+        fileName = fileName.substring(0, fileName.indexOf('('));
+        output.append(fileFormatPrefix);
+
+        // This has to do with nested directories, only tested with one level of nesting
+        if (fileName.contains(queryString.substring(1))) {
+          String [] _s = fileName.split("/");
+          output.append(_s[_s.length - 1]);
+        } else {
+          output.append(queryString + fileName);
+        }
+        output.append(fileFormatSuffixOne);
+
+        output.append(fileName);
+        output.append(fileFormatSuffixTwo);
+      } else if (s.contains("Directory")) {
+        String dirName = queryString + s.split(" ")[1] + "/";
+        output.append(dirFormatPrefix);
+        output.append(dirName);
+        output.append(dirFormatSuffixOne);
+        output.append(dirName.substring(1));
+        output.append(dirFormatSuffixTwo);
+      }
+      output.append("</p>");
+    }
+
+    return buildHTML(output.toString());
+  }
+
+  // Dynamically creates the ACCESS DENIED page
   public static void createSecurityErrorFile() {
     final String fileName = Constants.SECURITY_ERROR_FILE;
 
@@ -150,6 +228,7 @@ class DynamicHTMLGenerator {
     writeOutFile(absoluteFilePath, buildHTML(content));
   }
 
+  // Dynamically creates system-time.html
   public static void createCurrentTimeFile() {
 
     final String fileName = Constants.SYSTEM_TIME_FILE;
@@ -182,6 +261,43 @@ class DynamicHTMLGenerator {
 }
 
 class WebServerFileUtil {
+
+// https://condor.depaul.edu/elliott/435/hw/programs/mywebserver/ReadFiles.java
+  public static synchronized String readAllFilesInDir(String request) {
+
+
+    final String dir;
+    final String separator = FileSystems.getDefault().getSeparator();
+    String syntheticRoot;
+    StringBuilder builder = new StringBuilder();
+
+    try {
+      syntheticRoot = getDirectoryOfJAR() + separator;
+      if (request.length() == 1) {
+        dir = getDirectoryOfJAR();
+      } else {
+        dir = getDirectoryOfJAR() + separator + request;
+      }
+      File root = new File(dir);
+      File[] contents = root.listFiles();
+      for (File f : contents) {
+        String _f = f.toString().substring(syntheticRoot.length());
+        if (f.isDirectory()) {
+//          builder.append("Directory: " + f + Constants.EOL);
+          builder.append("Directory: " + _f + Constants.EOL);
+        } else if (f.isFile()) {
+          // This will expose the FULL PATH on your server, be careful using this on the real web
+//          builder.append("File: " + f + "(" + f.length() +")" + Constants.EOL);
+          builder.append("File: " + _f + "(" + f.length() +")" + Constants.EOL);
+        } else {
+          builder.append("Something went wrong with: " + f + Constants.EOL);
+        }
+      }
+    } catch (URISyntaxException e) {
+      e.printStackTrace();
+    }
+    return builder.toString();
+  }
 
   public static String determineFileType(String query) {
 

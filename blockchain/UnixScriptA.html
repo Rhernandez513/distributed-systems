@@ -1,0 +1,105 @@
+<html> 
+
+Note that you can always just trigger operation manually when starting
+process 2, so you can get by without a script, though it is not convenient.<p>
+
+Some ideas:<p>
+
+<pre>
+Thanks Kaz!
+
+I figured out a super clunky way of getting [Multiple Scripts] going [on Mac].  Hopefully it helps
+someone else - I'm sure there are lots of ways of improving this, but here's
+what I came up with.  The path to my Blockchain.java file is
+"Desktop/'CSC_435'/Blockchain", so you can change that depending on what
+your folder structure looks like
+
+osascript <<EOF
+tell app "Terminal"
+do script "cd Desktop/'CSC_435'/Blockchain && java --add-modules -->
+				--java.xml.bind Blockchain 0"
+end tell
+
+tell app "Terminal"
+do script "cd Desktop/'CSC 435'/Blockchain && java --add-modules -->
+				--java.xml.bind Blockchain 1"
+end tell
+
+tell app "Terminal"
+do script "cd Desktop/'CSC 435'/Blockchain && java --add-modules -->
+				--java.xml.bind Blockchain 2"
+end tell
+EOF
+</pre>
+
+<hr>
+
+<pre>
+
+Thanks Randy:
+
+2018-02-11
+
+I started searching around on iTerm's website and found a scripting
+reference page.
+
+https://www.iterm2.com/documentation-scripting.html
+
+After creating a new profile called BlockChain to direct the new terminals
+to the correct working directory in iTerm I used the following script that
+will get all 3 processes running in separate windows and it works like the
+demo in class.
+
+Save the below into scriptName.scpt
+
+tell application "iTerm2"
+create window with profile "BlockChain" command "java bc 0"
+create window with profile "BlockChain" command "java bc 1"
+create window with profile "BlockChain" command "java bc 2"
+end tell
+
+You can then run > osascript scriptName.scpt
+
+This isn't pretty, but it works for the demo code and I think with some
+small tweaks should work for the assignment.
+
+and 
+
+Thanks Matt:
+
+2018-02-11
+
+Another solution...not pretty but functional
+
+Copy below to allbat.sh
+
+run chmod 700 on allbat.sh 
+
+run ./allbat.sh at command line
+
+#!/bin/sh
+
+osascript <<END
+
+tell application "Terminal"
+
+    do script ("cd /Users/blah/GitHub/CS435/BlockChain;javac bc.java; java
+    bc 0")
+
+end tell
+
+tell application "Terminal"
+
+    do script ("cd /Users/blah/GitHub/CS435/BlockChain;javac bc.java; java
+    bc 1")
+
+end tell
+
+tell application "Terminal"
+
+    do script ("cd /Users/blah/GitHub/CS435/BlockChain;javac bc.java; java
+    bc 2")
+
+end tell
+
+</pre> </html>

@@ -1,0 +1,56 @@
+Clark Elliott's BlockFramework control-c to quit.
+
+--THIS IS CONSOLE OUTPUT FOR PROCESSS 2 ONLY--
+
+Using processID 2
+
+Starting Key Server input thread using 8050
+Starting the Unverified Block Server input thread using 8051
+Starting the blockchain server input thread using 8052
+Got key: FakeKeyProcess0
+Got key: FakeKeyProcess1
+Got key: FakeKeyProcess2
+Put in priority queue: (Block#14 from P0)
+
+Put in priority queue: (Block#34 from P2)
+
+Put in priority queue: (Block#13 from P0)
+
+Put in priority queue: (Block#24 from P1)
+
+Put in priority queue: (Block#33 from P2)
+
+Put in priority queue: (Block#23 from P1)
+
+Starting the Unverified Block Priority Queue Consumer thread.
+
+Consumer got unverified: (Block#13 from P0)
+         --NEW BLOCKCHAIN--
+[(Block#13 from P0) verified by P1 at time 449][First block]
+
+
+         --NEW BLOCKCHAIN--
+[(Block#14 from P0) verified by P1 at time 867][(Block#13 from P0) verified by P1 at time 449][First block]
+
+
+         --NEW BLOCKCHAIN--
+[(Block#23 from P1) verified by P1 at time 663][(Block#14 from P0) verified by P1 at time 867][(Block#13 from P0) verified by P1 at time 449][First block]
+
+
+Consumer got unverified: (Block#14 from P0)
+         --NEW BLOCKCHAIN--
+[(Block#24 from P1) verified by P1 at time 342][(Block#23 from P1) verified by P1 at time 663][(Block#14 from P0) verified by P1 at time 867][(Block#13 from P0) verified by P1 at time 449][First block]
+
+
+Consumer got unverified: (Block#23 from P1)
+         --NEW BLOCKCHAIN--
+[(Block#33 from P2) verified by P1 at time 922][(Block#24 from P1) verified by P1 at time 342][(Block#23 from P1) verified by P1 at time 663][(Block#14 from P0) verified by P1 at time 867][(Block#13 from P0) verified by P1 at time 449][First block]
+
+
+Consumer got unverified: (Block#24 from P1)
+         --NEW BLOCKCHAIN--
+[(Block#34 from P2) verified by P1 at time 606][(Block#33 from P2) verified by P1 at time 922][(Block#24 from P1) verified by P1 at time 342][(Block#23 from P1) verified by P1 at time 663][(Block#14 from P0) verified by P1 at time 867][(Block#13 from P0) verified by P1 at time 449][First block]
+
+
+Consumer got unverified: (Block#33 from P2)
+Consumer got unverified: (Block#34 from P2)

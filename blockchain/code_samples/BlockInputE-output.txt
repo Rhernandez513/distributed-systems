@@ -1,0 +1,73 @@
+Process number: 0 Ports: 4710 4820
+
+Using input file: BlockInput0.txt
+4 records read.
+Names from input:
+  John Smith
+  Joe Blow
+  Julie Wilson
+  Wayne Blaine
+
+
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<BlockLedger>
+<blockRecord>
+    <ABlockID>9365307b-c611-460c-a766-46dad53b18c5</ABlockID>
+    <ACreatingProcess>Process0</ACreatingProcess>
+    <ASHA256String>SHA string goes here...</ASHA256String>
+    <ASignedSHA256>Signed SHA string goes here...</ASignedSHA256>
+    <AVerificationProcessID>To be set later...</AVerificationProcessID>
+    <FDOB>1996.03.07</FDOB>
+    <FFname>John</FFname>
+    <FLname>Smith</FLname>
+    <FSSNum>123-45-6789</FSSNum>
+    <GDiag>Chickenpox</GDiag>
+    <GRx>aspirin</GRx>
+    <GTreat>BedRest</GTreat>
+</blockRecord>
+
+<blockRecord>
+    <ABlockID>4fdea20f-0374-484e-8314-af0fe0dcc8ad</ABlockID>
+    <ACreatingProcess>Process0</ACreatingProcess>
+    <ASHA256String>SHA string goes here...</ASHA256String>
+    <ASignedSHA256>Signed SHA string goes here...</ASignedSHA256>
+    <AVerificationProcessID>To be set later...</AVerificationProcessID>
+    <FDOB>1996.03.07</FDOB>
+    <FFname>Joe</FFname>
+    <FLname>Blow</FLname>
+    <FSSNum>123-45-6888</FSSNum>
+    <GDiag>Smallpox</GDiag>
+    <GRx>Whiskey</GRx>
+    <GTreat>BedRest</GTreat>
+</blockRecord>
+
+<blockRecord>
+    <ABlockID>337b5313-da5b-4abd-8b5a-92ddb57fef65</ABlockID>
+    <ACreatingProcess>Process0</ACreatingProcess>
+    <ASHA256String>SHA string goes here...</ASHA256String>
+    <ASignedSHA256>Signed SHA string goes here...</ASignedSHA256>
+    <AVerificationProcessID>To be set later...</AVerificationProcessID>
+    <FDOB>1996.03.07</FDOB>
+    <FFname>Julie</FFname>
+    <FLname>Wilson</FLname>
+    <FSSNum>123-45-6999</FSSNum>
+    <GDiag>Insomnia</GDiag>
+    <GRx>HotPeppers</GRx>
+    <GTreat>Exercise</GTreat>
+</blockRecord>
+
+<blockRecord>
+    <ABlockID>4511b4e8-1185-4bad-b3dc-a66e6e8b01c3</ABlockID>
+    <ACreatingProcess>Process0</ACreatingProcess>
+    <ASHA256String>SHA string goes here...</ASHA256String>
+    <ASignedSHA256>Signed SHA string goes here...</ASignedSHA256>
+    <AVerificationProcessID>To be set later...</AVerificationProcessID>
+    <FDOB>1942.07.07</FDOB>
+    <FFname>Wayne</FFname>
+    <FLname>Blaine</FLname>
+    <FSSNum>123-45-6777</FSSNum>
+    <GDiag>Measles</GDiag>
+    <GRx>CodLiverOil</GRx>
+    <GTreat>WaitToGetBetter</GTreat>
+</blockRecord>
+</BlockLedger>

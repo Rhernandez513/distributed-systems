@@ -80,7 +80,6 @@ class WebServerWorker implements Runnable {
             directoryFlag = true;
             String directoryContents = WebServerFileUtil.readAllFilesInDir(queryString);
             String formattedContents = DynamicHTMLGenerator.createDirectoryListingFile(directoryContents, queryString);
-//            fileContents.add(directoryContents);
             fileContents.add(formattedContents);
           }
 
@@ -116,6 +115,7 @@ class WebServerWorker implements Runnable {
     }
   }
 
+  // This function deals with building the HTTP header and attaching the data
   private String buildResponse(String contentType, String payload) {
 
     StringBuilder builder = new StringBuilder();

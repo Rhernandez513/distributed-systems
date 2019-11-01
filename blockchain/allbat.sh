@@ -6,20 +6,20 @@ osascript <<END
 
 tell application "Terminal"
 
-    do script ("cd \"/Users/robertdavidhernandez/Documents/grad school/CSC 435/distributed-systems/blockchain/src/main/java\";javac bc.java; java bc 0")
+    do script ("cd \"/Users/robertdavidhernandez/Documents/grad school/CSC 435/distributed-systems/blockchain/src/main/java\";javac Blockchain.java; java Blockchain 0")
 
 
 end tell
 
 tell application "Terminal"
 
-    do script ("cd \"/Users/robertdavidhernandez/Documents/grad school/CSC 435/distributed-systems/blockchain/src/main/java\";javac bc.java; java bc 1")
+    do script ("cd \"/Users/robertdavidhernandez/Documents/grad school/CSC 435/distributed-systems/blockchain/src/main/java\";javac Blockchain.java; java Blockchain 1")
 
 end tell
 
 tell application "Terminal"
 
-    do script ("cd \"/Users/robertdavidhernandez/Documents/grad school/CSC 435/distributed-systems/blockchain/src/main/java\";javac bc.java; java bc 2")
+    do script ("cd \"/Users/robertdavidhernandez/Documents/grad school/CSC 435/distributed-systems/blockchain/src/main/java\";javac Blockchain.java; java Blockchain 2")
 
 end tell
 

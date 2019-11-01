@@ -47,9 +47,9 @@ class Ports{
   public static int BlockchainServerPort;
 
   public void setPorts(){
-    KeyServerPort = KeyServerPortBase + (bc.PID);
-    UnverifiedBlockServerPort = UnverifiedBlockServerPortBase + (bc.PID);
-    BlockchainServerPort = BlockchainServerPortBase + (bc.PID);
+    KeyServerPort = KeyServerPortBase + (Blockchain.PID);
+    UnverifiedBlockServerPort = UnverifiedBlockServerPortBase + (Blockchain.PID);
+    BlockchainServerPort = BlockchainServerPortBase + (Blockchain.PID);
   }
 }
 
@@ -76,7 +76,7 @@ class PublicKeyServer implements Runnable {
     Socket sock;
     System.out.println("Starting Key Server input thread using: " + Ports.KeyServerPort);
     try {
-      ServerSocket servsock = new ServerSocket(Ports.KeyServerPort, bc.Q_LEN);
+      ServerSocket servsock = new ServerSocket(Ports.KeyServerPort, Blockchain.Q_LEN);
       while (true) {
         sock = servsock.accept();
         new PublicKeyWorker (sock).start();
@@ -115,7 +115,7 @@ class UnverifiedBlockServer implements Runnable {
     Socket sock;
     System.out.println("Starting the Unverified Block Server input thread using " + Ports.UnverifiedBlockServerPort);
     try {
-      ServerSocket servsock = new ServerSocket(Ports.UnverifiedBlockServerPort, bc.Q_LEN);
+      ServerSocket servsock = new ServerSocket(Ports.UnverifiedBlockServerPort, Blockchain.Q_LEN);
       while (true) {
         sock = servsock.accept(); // Got a new unverified block
         new UnverifiedBlockWorker(sock).start(); // So start a thread to process it.
@@ -161,13 +161,13 @@ class UnverifiedBlockConsumer implements Runnable {
         /* With duplicate blocks that have been verified by different processes ordinarily we would keep only the one with
         the lowest verification timestamp. For the example we use a crude filter, which also may let some duplicates through */
         // TODO create a true filter for the lowest timestamp
-        if(bc.blockchain.indexOf(data.substring(1, 9)) < 0) { // Crude, but excludes most duplicates.
-          fakeVerifiedBlock = "[" + data + " verified by P" + bc.PID + " at time "
+        if(Blockchain.blockchain.indexOf(data.substring(1, 9)) < 0) { // Crude, but excludes most duplicates.
+          fakeVerifiedBlock = "[" + data + " verified by P" + Blockchain.PID + " at time "
             + ThreadLocalRandom.current().nextInt(100,1000) + "]\n";
           System.out.println(fakeVerifiedBlock);
-          String tempblockchain = fakeVerifiedBlock + bc.blockchain; // add the verified block to the chain
-          for(int i=0; i < bc.numProcesses; i++){ // send to each process in group, including us:
-            sock = new Socket(bc.serverName, Ports.BlockchainServerPortBase + (i));
+          String tempblockchain = fakeVerifiedBlock + Blockchain.blockchain; // add the verified block to the chain
+          for(int i = 0; i < Blockchain.numProcesses; i++){ // send to each process in group, including us:
+            sock = new Socket(Blockchain.serverName, Ports.BlockchainServerPortBase + (i));
             toServer = new PrintStream(sock.getOutputStream());
 
             // make the multicast
@@ -197,8 +197,8 @@ class BlockchainWorker extends Thread {
         data = data + data2;
       }
       // TODO Check here for "winner"
-      bc.blockchain = data; // Would normally have to check first for winner before replacing.
-      System.out.println("         --NEW BLOCKCHAIN--\n" + bc.blockchain + "\n\n");
+      Blockchain.blockchain = data; // Would normally have to check first for winner before replacing.
+      System.out.println("         --NEW BLOCKCHAIN--\n" + Blockchain.blockchain + "\n\n");
       sock.close();
     } catch (IOException x){x.printStackTrace();}
   }
@@ -209,7 +209,7 @@ class BlockchainServer implements Runnable {
     Socket sock;
     System.out.println("Starting the blockchain server input thread using " + Ports.BlockchainServerPort);
     try{
-      ServerSocket servsock = new ServerSocket(Ports.BlockchainServerPort, bc.Q_LEN);
+      ServerSocket servsock = new ServerSocket(Ports.BlockchainServerPort, Blockchain.Q_LEN);
       while (true) {
         sock = servsock.accept();
         new BlockchainWorker (sock).start();
@@ -219,7 +219,7 @@ class BlockchainServer implements Runnable {
 }
 
 // Class bc for BlockChain
-public class bc {
+public class Blockchain {
 
   public final static int Q_LEN = 6;
 
@@ -231,14 +231,14 @@ public class bc {
   // Multicast some data to each of the processes.
   public void MultiSend (){
     try {
-      String fakeKey = ("FakeKeyProcess: " + bc.PID);
+      String fakeKey = ("FakeKeyProcess: " + Blockchain.PID);
       broadcast(Ports.KeyServerPortBase, fakeKey);
 
       Thread.sleep(1000); // wait for keys to settle, normally would wait for an ack
 
       //Fancy arithmetic is just to generate identifiable blockIDs out of numerical sort order:
-      String fakeBlockA = "(Block#" + ((bc.PID+1)*10)+4 + " from P"+ bc.PID + ")";
-      String fakeBlockB = "(Block#" + ((bc.PID+1)*10)+3 + " from P"+ bc.PID + ")";
+      String fakeBlockA = "(Block#" + ((Blockchain.PID+1)*10)+4 + " from P"+ Blockchain.PID + ")";
+      String fakeBlockB = "(Block#" + ((Blockchain.PID+1)*10)+3 + " from P"+ Blockchain.PID + ")";
 
       broadcast(Ports.UnverifiedBlockServerPortBase, fakeBlockA);
       broadcast(Ports.UnverifiedBlockServerPortBase, fakeBlockB);
@@ -273,7 +273,7 @@ public class bc {
     new Thread(new UnverifiedBlockServer(queue)).start(); // New thread to process incoming unverified blocks
     new Thread(new BlockchainServer()).start(); // New thread to process incoming new blockchains
     try{Thread.sleep(1000);}catch(Exception e){} // Wait for servers to start.
-    new bc().MultiSend(); // Multicast some new unverified blocks out to all servers as data
+    new Blockchain().MultiSend(); // Multicast some new unverified blocks out to all servers as data
     try{Thread.sleep(1000);}catch(Exception e){} // Wait for multicast to fill incoming queue for our example.
 
     new Thread(new UnverifiedBlockConsumer(queue)).start(); // Start consuming the queued-up unverified blocks

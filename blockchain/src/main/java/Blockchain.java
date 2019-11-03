@@ -106,7 +106,9 @@ class UnverifiedBlockServer implements Runnable {
       try (BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream()))){
         String data = in.readLine ();
         // TODO Double check that this Worker doesn't have additional scope in the assignment
-        System.out.println("Put in priority queue: " + data + "\n");
+        data = data.substring(6);
+        data = data.replace("--linebreak--", "\n");
+        System.out.println("Put in priority queue:\n" + data + "\n");
         queue.put(data);
       } catch (Exception e) {
         e.printStackTrace();
@@ -151,7 +153,7 @@ class UnverifiedBlockConsumer implements Runnable {
       while(true){ // Consume from the incoming queue. Do the work to verify. Mulitcast new blockchain
         // TODO notice here the data object is the unverifiedBlock
         data = queue.take(); // Will blocked-wait on empty queue
-        System.out.println("Consumer got unverified: " + data);
+        System.out.println("Consumer got unverified:\n" + data + "\n");
 
         // TODO Ordinarily we would do real work here, based on the incoming data.
         int j; // Here we fake doing some work (That is, here we could cheat, so not ACTUAL work...)
@@ -242,28 +244,31 @@ public class Blockchain {
       Thread.sleep(1000); // wait for keys to settle, normally would wait for an ack
 
       //Fancy arithmetic is just to generate identifiable blockIDs out of numerical sort order:
-      String fakeBlockA = "(Block#" + ((Blockchain.PID+1)*10)+4 + " from P"+ Blockchain.PID + ")";
-      String fakeBlockB = "(Block#" + ((Blockchain.PID+1)*10)+3 + " from P"+ Blockchain.PID + ")";
+//      String fakeBlockA = "(Block#" + ((Blockchain.PID+1)*10)+4 + " from P"+ Blockchain.PID + ")";
+//      String fakeBlockB = "(Block#" + ((Blockchain.PID+1)*10)+3 + " from P"+ Blockchain.PID + ")";
 
       String [] args = { String.valueOf(PID) } ;
       String XMLBlock = BlockInputE.main(args);
 
-      List<String> blocks = (List<String>) unMarshallBlocks(XMLBlock);
+      List<String> blocks =  unMarshallBlocks(XMLBlock);
 
-//      for (String block : blocks) {
-//        broadcast(Ports.UnverifiedBlockServerPort, block);
-//      }
-
-      broadcast(Ports.UnverifiedBlockServerPort, fakeBlockA);
-      broadcast(Ports.UnverifiedBlockServerPort, fakeBlockB);
+      for (String block : blocks) {
+        block = block.replace("\n", "--linebreak--");
+        broadcast(Ports.UnverifiedBlockServerPort, "PID: " + Blockchain.PID + block);
+      }
 
     } catch (Exception e) {
       e.printStackTrace();
     }
   }
 
-  private Collection<String> unMarshallBlocks(String xmlBlock) {
-    return null;
+  private List<String> unMarshallBlocks(String xmlBlock) {
+
+    String[] blocks = xmlBlock.split("\n\n");
+    blocks[0] = blocks[0].split("<BlockLedger>")[1].trim();
+    blocks[blocks.length - 1] = blocks[blocks.length - 1].split("</BlockLedger>")[0].trim();
+
+    return Arrays.asList(blocks);
   }
 
   private void broadcast(int port, String payload) throws IOException {

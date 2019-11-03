@@ -25,11 +25,15 @@ Verfy the signature with public key that has been restored.
 
 */
 
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.Marshaller;
+import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlRootElement;
 import java.io.*;
 import java.net.*;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.*;
 
 // Would normally keep a process block for each process in the multicast group:
@@ -232,7 +236,7 @@ public class Blockchain {
   static String blockchain = "[First block]";
 
   // TODO don't forget to change this back to 3 when not DEBUGGING
-  final static int numProcesses = 1; // Set this to match your batch execution file that starts N processes with args 0,1,2,...N
+  final static int numProcesses = 3; // Set this to match your batch execution file that starts N processes with args 0,1,2,...N
   static int PID;
 
   // Multicast some data to each of the processes.
@@ -248,7 +252,7 @@ public class Blockchain {
 //      String fakeBlockB = "(Block#" + ((Blockchain.PID+1)*10)+3 + " from P"+ Blockchain.PID + ")";
 
       String [] args = { String.valueOf(PID) } ;
-      String XMLBlock = BlockInputE.main(args);
+      String XMLBlock = BlockInput.getXMLBlock(args);
 
       List<String> blocks =  unMarshallBlocks(XMLBlock);
 
@@ -307,5 +311,190 @@ public class Blockchain {
 
     // Start consuming the queued-up unverified blocks
     new Thread(new UnverifiedBlockConsumer(queue)).start();
+  }
+}
+
+// BEGIN BlockInputE //
+
+@XmlRootElement
+class BlockRecord{
+  /* Examples of block fields: */
+  String SHA256String;
+  String SignedSHA256;
+  String BlockID;
+  String VerificationProcessID;
+  String CreatingProcess;
+  String PreviousHash;
+  String Fname;
+  String Lname;
+  String SSNum;
+  String DOB;
+  String Diag;
+  String Treat;
+  String Rx;
+
+  /* Examples of accessors for the BlockRecord fields. Note that the XML tools sort the fields alphabetically
+     by name of accessors, so A=header, F=Indentification, G=Medical: */
+
+  public String getASHA256String() {return SHA256String;}
+  @XmlElement
+  public void setASHA256String(String SH){this.SHA256String = SH;}
+
+  public String getASignedSHA256() {return SignedSHA256;}
+  @XmlElement
+  public void setASignedSHA256(String SH){this.SignedSHA256 = SH;}
+
+  public String getACreatingProcess() {return CreatingProcess;}
+  @XmlElement
+  public void setACreatingProcess(String CP){this.CreatingProcess = CP;}
+
+  public String getAVerificationProcessID() {return VerificationProcessID;}
+  @XmlElement
+  public void setAVerificationProcessID(String VID){this.VerificationProcessID = VID;}
+
+  public String getABlockID() {return BlockID;}
+  @XmlElement
+  public void setABlockID(String BID){this.BlockID = BID;}
+
+  public String getFSSNum() {return SSNum;}
+  @XmlElement
+  public void setFSSNum(String SS){this.SSNum = SS;}
+
+  public String getFFname() {return Fname;}
+  @XmlElement
+  public void setFFname(String FN){this.Fname = FN;}
+
+  public String getFLname() {return Lname;}
+  @XmlElement
+  public void setFLname(String LN){this.Lname = LN;}
+
+  public String getFDOB() {return DOB;}
+  @XmlElement
+  public void setFDOB(String DOB){this.DOB = DOB;}
+
+  public String getGDiag() {return Diag;}
+  @XmlElement
+  public void setGDiag(String D){this.Diag = D;}
+
+  public String getGTreat() {return Treat;}
+  @XmlElement
+  public void setGTreat(String D){this.Treat = D;}
+
+  public String getGRx() {return Rx;}
+  @XmlElement
+  public void setGRx(String D){this.Rx = D;}
+
+}
+
+
+class BlockInput {
+
+  private static String FILENAME;
+
+  /* Token indexes for input: */
+  private static final int iFNAME = 0;
+  private static final int iLNAME = 1;
+  private static final int iDOB = 2;
+  private static final int iSSNUM = 3;
+  private static final int iDIAG = 4;
+  private static final int iTREAT = 5;
+  private static final int iRX = 6;
+
+  public static String getXMLBlock(String[] args) throws Exception {
+
+    String result;
+
+    /* CDE: Process numbers and port numbers to be used: */
+    int pnum;
+    int UnverifiedBlockPort;
+    int BlockChainPort;
+
+    /* CDE If you want to trigger bragging rights functionality... */
+    if (args.length > 1) System.out.println("Special functionality is present \n");
+
+    if (args.length < 1) pnum = 0;
+    else if (args[0].equals("0")) pnum = 0;
+    else if (args[0].equals("1")) pnum = 1;
+    else if (args[0].equals("2")) pnum = 2;
+    else pnum = 0; /* Default for badly formed argument */
+
+    UnverifiedBlockPort = 4820 + pnum;
+    BlockChainPort = 4930 + pnum;
+
+    System.out.println("Process number: " + pnum + " Ports: " + UnverifiedBlockPort + " " +
+            BlockChainPort + "\n");
+
+    switch(pnum) {
+      case 1: FILENAME = "BlockInput1.txt"; break;
+      case 2: FILENAME = "BlockInput2.txt"; break;
+      default: FILENAME= "BlockInput0.txt"; break;
+    }
+
+    System.out.println("Using input file: " + FILENAME);
+
+    try (BufferedReader br = new BufferedReader(new FileReader(FILENAME))) {
+      String[] tokens = new String[10];
+      String stringXML;
+      String InputLineStr;
+      String suuid;
+      UUID idA;
+
+      BlockRecord[] blockArray = new BlockRecord[20];
+
+      JAXBContext jaxbContext = JAXBContext.newInstance(BlockRecord.class);
+      Marshaller jaxbMarshaller = jaxbContext.createMarshaller();
+      StringWriter sw = new StringWriter();
+
+      // CDE Make the output pretty printed:
+      jaxbMarshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
+
+      int n = 0;
+
+      while ((InputLineStr = br.readLine()) != null) {
+        blockArray[n] = new BlockRecord();
+
+        // TODO Generate SHA 256 String?
+        blockArray[n].setASHA256String("SHA string goes here...");
+        // TODO Sign said SHA 256
+        blockArray[n].setASignedSHA256("Signed SHA string goes here...");
+
+        /* CDE: Generate a unique blockID. This would also be signed by creating process: */
+        idA = UUID.randomUUID();
+        suuid = UUID.randomUUID().toString();
+        blockArray[n].setABlockID(suuid);
+        blockArray[n].setACreatingProcess("Process" + pnum);
+        // TODO check assignment desc for this one
+        blockArray[n].setAVerificationProcessID("To be set later...");
+        /* CDE put the file data into the block record: */
+        tokens = InputLineStr.split(" +"); // Tokenize the input
+        blockArray[n].setFSSNum(tokens[iSSNUM]);
+        blockArray[n].setFFname(tokens[iFNAME]);
+        blockArray[n].setFLname(tokens[iLNAME]);
+        blockArray[n].setFDOB(tokens[iDOB]);
+        blockArray[n].setGDiag(tokens[iDIAG]);
+        blockArray[n].setGTreat(tokens[iTREAT]);
+        blockArray[n].setGRx(tokens[iRX]);
+        n++;
+      }
+      System.out.println(n + " records read.");
+      System.out.println("Names from input:");
+      for(int i=0; i < n; i++){
+        System.out.println("  " + blockArray[i].getFFname() + " " +
+                blockArray[i].getFLname());
+      }
+      System.out.println("\n");
+
+//      stringXML = sw.toString();
+      for(int i=0; i < n; i++){
+        jaxbMarshaller.marshal(blockArray[i], sw);
+      }
+      String fullBlock = sw.toString();
+      String XMLHeader = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
+      String cleanBlock = fullBlock.replace(XMLHeader, "");
+      // Show the string of concatenated, individual XML blocks:
+      String XMLBlock = XMLHeader + "\n<BlockLedger>" + cleanBlock + "</BlockLedger>";
+      return XMLBlock;
+    } catch (IOException e) {e.printStackTrace();}
+    return null;
   }
 }

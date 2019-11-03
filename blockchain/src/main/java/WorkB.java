@@ -50,13 +50,11 @@ public class WorkB {
     return builder.toString();
   }
   
-  public static void main(String[] args) throws Exception {
+  public static String verifyBlock(BlockRecord inputBlock) throws Exception {
     String concatenatedStr;  // Random seed string concatenated with the existing data
     String stringOut; // Will contain the new SHA256 string converted to HEX and printable.
 
-    Scanner ourInput = new Scanner(System.in);
-    System.out.print("Enter some blockdata: ");
-    String InputString = ourInput.nextLine();
+    String InputString = inputBlock.toString();
 
     randomString = randomAlphaNumeric(8);
     System.out.println("Our example random seed string is: " + randomString + "\n");
@@ -108,5 +106,6 @@ public class WorkB {
     } catch(Exception ex) {
       ex.printStackTrace();
     }
+    return null;
   }
 }

@@ -116,7 +116,7 @@ class UnverifiedBlockServer implements Runnable {
     Socket sock;
     UnverifiedBlockWorker (Socket s) {sock = s;}
 
-    private JAXBElement<BlockRecord> unMarshallXMLBlock(String XMLBlock) {
+    private BlockRecord unMarshallXMLBlock(String XMLBlock) {
 
       XMLBlock.replace("\n", "");
 
@@ -129,7 +129,8 @@ class UnverifiedBlockServer implements Runnable {
         // Unmarshallers are not thread-safe.  Create a new one every time.
         XMLStreamReader reader = XMLInputFactory.newInstance().createXMLStreamReader(new StringReader(XMLBlock));
 
-        return jaxbUnmarshaller.unmarshal(reader, BlockRecord.class);
+        JAXBElement<BlockRecord> result = jaxbUnmarshaller.unmarshal(reader, BlockRecord.class);
+        return result.getValue();
 
       } catch (Exception e) {
         e.printStackTrace();
@@ -144,9 +145,7 @@ class UnverifiedBlockServer implements Runnable {
         data = data.substring(6);
         data = data.replace("--linebreak--", "\n");
 
-        JAXBElement<BlockRecord> blockRecordJAXBElement = unMarshallXMLBlock(data);
-
-        BlockRecord blockRecord = blockRecordJAXBElement.getValue();
+        BlockRecord blockRecord = unMarshallXMLBlock(data);
 
         System.out.println("Put in priority queue:\n" + data + "\n");
         queue.put(blockRecord);
@@ -191,9 +190,8 @@ class UnverifiedBlockConsumer implements Runnable {
     System.out.println("Starting the Unverified Block Priority Queue Consumer thread.\n");
     try{
       while(true){ // Consume from the incoming queue. Do the work to verify. Mulitcast new blockchain
-        // TODO notice here the data object is the unverifiedBlock
         data = queue.take(); // Will blocked-wait on empty queue
-        System.out.println("Consumer got unverified Block:\n" + "BlockID: " + data + "\n");
+        System.out.println("Consumer got unverified Block:\n" + data + "\n");
 
         // TODO Ordinarily we would do real work here, based on the incoming data.
         int j; // Here we fake doing some work (That is, here we could cheat, so not ACTUAL work...)
@@ -203,9 +201,15 @@ class UnverifiedBlockConsumer implements Runnable {
           if (j < 3) break; // <- how hard our fake work is; about 1.5 seconds.
         }
 
+
+        // !! At this point a block should be "solved" !! //
+
+        // The blow logic is primarily concerned with determining if the "solved" block can be appened to the end of the
+        // block chain and then rebroadcasting it to the rest of the chain
+
         /* With duplicate blocks that have been verified by different processes ordinarily we would keep only the one with
         the lowest verification timestamp. For the example we use a crude filter, which also may let some duplicates through */
-        // TODO create a true filter for the lowest timestamp
+//        // TODO create a true filter for the lowest timestamp
 //        if(Blockchain.blockchain.indexOf(data.substring(1, 9)) < 0) { // Crude, but excludes most duplicates.
 //          fakeVerifiedBlock = "[" + data + " verified by P" + Blockchain.PID + " at time "
 //            + ThreadLocalRandom.current().nextInt(100,1000) + "]\n";
@@ -425,7 +429,24 @@ class BlockRecord implements Comparable {
 
   @Override
   public String toString() {
-    return this.getABlockID();
+    try {
+      JAXBContext jaxbContext = JAXBContext.newInstance(BlockRecord.class);
+      Marshaller jaxbMarshaller = jaxbContext.createMarshaller();
+      StringWriter sw = new StringWriter();
+
+      jaxbMarshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
+      jaxbMarshaller.marshal(this, sw);
+
+      String result = sw.toString();
+
+      String XMLHeader = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
+      String cleanBlock = result.replace(XMLHeader, "");
+
+      return cleanBlock;
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    return null;
   }
 
   @Override
@@ -572,7 +593,7 @@ class BlockInput {
       }
       System.out.println("\n");
 
-//      stringXML = sw.toString();
+      stringXML = sw.toString();
       for(int i=0; i < n; i++){
         jaxbMarshaller.marshal(blockArray[i], sw);
       }

@@ -184,8 +184,9 @@ public class BlockInputE {
   private static final int iTREAT = 5;
   private static final int iRX = 6;
 
+  public static String main(String[] args) throws Exception {
 
-  public static void main(String[] args) throws Exception {
+    String result;
 
     /* CDE: Process numbers and port numbers to be used: */
     int pnum;
@@ -200,13 +201,14 @@ public class BlockInputE {
     else if (args[0].equals("1")) pnum = 1;
     else if (args[0].equals("2")) pnum = 2;
     else pnum = 0; /* Default for badly formed argument */
-    UnverifiedBlockPort = 4710 + pnum;
-    BlockChainPort = 4820 + pnum;
+
+    UnverifiedBlockPort = 4820 + pnum;
+    BlockChainPort = 4930 + pnum;
 
     System.out.println("Process number: " + pnum + " Ports: " + UnverifiedBlockPort + " " + 
 		       BlockChainPort + "\n");
 
-    switch(pnum){
+    switch(pnum) {
       case 1: FILENAME = "BlockInput1.txt"; break;
       case 2: FILENAME = "BlockInput2.txt"; break;
       default: FILENAME= "BlockInput0.txt"; break;
@@ -244,7 +246,7 @@ public class BlockInputE {
         idA = UUID.randomUUID();
         suuid = UUID.randomUUID().toString();
         blockArray[n].setABlockID(suuid);
-        blockArray[n].setACreatingProcess("Process" + Integer.toString(pnum));
+        blockArray[n].setACreatingProcess("Process" + pnum);
         // TODO check assignment desc for this one
         blockArray[n].setAVerificationProcessID("To be set later...");
         /* CDE put the file data into the block record: */
@@ -275,8 +277,10 @@ public class BlockInputE {
       String cleanBlock = fullBlock.replace(XMLHeader, "");
       // Show the string of concatenated, individual XML blocks:
       String XMLBlock = XMLHeader + "\n<BlockLedger>" + cleanBlock + "</BlockLedger>";
-      System.out.println(XMLBlock);
+//      System.out.println(XMLBlock);
+      return XMLBlock;
     } catch (IOException e) {e.printStackTrace();}
+    return null;
   }
 }
 

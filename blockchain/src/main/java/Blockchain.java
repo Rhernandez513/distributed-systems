@@ -27,6 +27,9 @@ Verfy the signature with public key that has been restored.
 
 import java.io.*;
 import java.net.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.*;
 
 // Would normally keep a process block for each process in the multicast group:
@@ -225,14 +228,16 @@ public class Blockchain {
 
   static String serverName = "localhost";
   static String blockchain = "[First block]";
-  final static int numProcesses = 3; // Set this to match your batch execution file that starts N processes with args 0,1,2,...N
+
+  // TODO don't forget to change this back to 3 when not DEBUGGING
+  final static int numProcesses = 1; // Set this to match your batch execution file that starts N processes with args 0,1,2,...N
   static int PID;
 
   // Multicast some data to each of the processes.
   public void MultiSend (){
     try {
       String fakeKey = ("FakeKeyProcess: " + Blockchain.PID);
-      broadcast(Ports.KeyServerPortBase, fakeKey);
+      broadcast(Ports.KeyServerPort, fakeKey);
 
       Thread.sleep(1000); // wait for keys to settle, normally would wait for an ack
 
@@ -240,12 +245,25 @@ public class Blockchain {
       String fakeBlockA = "(Block#" + ((Blockchain.PID+1)*10)+4 + " from P"+ Blockchain.PID + ")";
       String fakeBlockB = "(Block#" + ((Blockchain.PID+1)*10)+3 + " from P"+ Blockchain.PID + ")";
 
-      broadcast(Ports.UnverifiedBlockServerPortBase, fakeBlockA);
-      broadcast(Ports.UnverifiedBlockServerPortBase, fakeBlockB);
+      String [] args = { String.valueOf(PID) } ;
+      String XMLBlock = BlockInputE.main(args);
 
-    } catch (InterruptedException | IOException e) {
+      List<String> blocks = (List<String>) unMarshallBlocks(XMLBlock);
+
+//      for (String block : blocks) {
+//        broadcast(Ports.UnverifiedBlockServerPort, block);
+//      }
+
+      broadcast(Ports.UnverifiedBlockServerPort, fakeBlockA);
+      broadcast(Ports.UnverifiedBlockServerPort, fakeBlockB);
+
+    } catch (Exception e) {
       e.printStackTrace();
     }
+  }
+
+  private Collection<String> unMarshallBlocks(String xmlBlock) {
+    return null;
   }
 
   private void broadcast(int port, String payload) throws IOException {
@@ -269,13 +287,20 @@ public class Blockchain {
     final BlockingQueue<String> queue = new PriorityBlockingQueue<>(); // Concurrent queue for unverified blocks
     new Ports().setPorts(); // Establish OUR port number scheme, based on PID
 
-    new Thread(new PublicKeyServer()).start(); // New thread to process incoming public keys
-    new Thread(new UnverifiedBlockServer(queue)).start(); // New thread to process incoming unverified blocks
-    new Thread(new BlockchainServer()).start(); // New thread to process incoming new blockchains
-    try{Thread.sleep(1000);}catch(Exception e){} // Wait for servers to start.
-    new Blockchain().MultiSend(); // Multicast some new unverified blocks out to all servers as data
-    try{Thread.sleep(1000);}catch(Exception e){} // Wait for multicast to fill incoming queue for our example.
+    // New thread to process incoming public keys
+    new Thread(new PublicKeyServer()).start();
+    // New thread to process incoming unverified blocks
+    new Thread(new UnverifiedBlockServer(queue)).start();
+    // New thread to process incoming new blockchains
+    new Thread(new BlockchainServer()).start();
+    // Wait for servers to start.
+    try{Thread.sleep(1000);}catch(Exception e){}
+    // Multicast some new unverified blocks out to all servers as data
+    new Blockchain().MultiSend();
+    // Wait for multicast to fill incoming queue for our example.
+    try{Thread.sleep(1000);}catch(Exception e){}
 
-    new Thread(new UnverifiedBlockConsumer(queue)).start(); // Start consuming the queued-up unverified blocks
+    // Start consuming the queued-up unverified blocks
+    new Thread(new UnverifiedBlockConsumer(queue)).start();
   }
 }

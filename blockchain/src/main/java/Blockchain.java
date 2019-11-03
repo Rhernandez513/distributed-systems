@@ -25,12 +25,21 @@ Verfy the signature with public key that has been restored.
 
 */
 
+import sun.jvm.hotspot.opto.Block;
+
+import javax.xml.bind.DatatypeConverter;
 import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBElement;
 import javax.xml.bind.Marshaller;
+import javax.xml.bind.Unmarshaller;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamReader;
 import java.io.*;
 import java.net.*;
+import java.security.MessageDigest;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -44,7 +53,7 @@ import java.util.concurrent.*;
   String IPAddress;
   } */
 
-class Ports{
+class Ports {
   public static int KeyServerPortBase = 4710;
   public static int UnverifiedBlockServerPortBase = 4820;
   public static int BlockchainServerPortBase = 4930;
@@ -95,8 +104,8 @@ class PublicKeyServer implements Runnable {
 }
 
 class UnverifiedBlockServer implements Runnable {
-  BlockingQueue<String> queue;
-  UnverifiedBlockServer(BlockingQueue<String> queue){
+  BlockingQueue<BlockRecord> queue;
+  UnverifiedBlockServer(BlockingQueue<BlockRecord> queue){
     this.queue = queue;
   }
 
@@ -106,14 +115,41 @@ class UnverifiedBlockServer implements Runnable {
   class UnverifiedBlockWorker extends Thread {
     Socket sock;
     UnverifiedBlockWorker (Socket s) {sock = s;}
+
+    private JAXBElement<BlockRecord> unMarshallXMLBlock(String XMLBlock) {
+
+      XMLBlock.replace("\n", "");
+
+      // From: https://www.intertech.com/Blog/jaxb-tutorial-how-to-marshal-and-unmarshal-xml/
+      // Credit to Joseph Varilla from class for the link
+      try {
+        JAXBContext jaxbContext = JAXBContext.newInstance(BlockRecord.class);
+        Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
+
+        // Unmarshallers are not thread-safe.  Create a new one every time.
+        XMLStreamReader reader = XMLInputFactory.newInstance().createXMLStreamReader(new StringReader(XMLBlock));
+
+        return jaxbUnmarshaller.unmarshal(reader, BlockRecord.class);
+
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+      return null;
+    }
+
     public void run(){
       try (BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream()))){
         String data = in.readLine ();
-        // TODO Double check that this Worker doesn't have additional scope in the assignment
+        // 0 - 6 contant "PID: X" where X is the pnum, perhaps useful later
         data = data.substring(6);
         data = data.replace("--linebreak--", "\n");
+
+        JAXBElement<BlockRecord> blockRecordJAXBElement = unMarshallXMLBlock(data);
+
+        BlockRecord blockRecord = blockRecordJAXBElement.getValue();
+
         System.out.println("Put in priority queue:\n" + data + "\n");
-        queue.put(data);
+        queue.put(blockRecord);
       } catch (Exception e) {
         e.printStackTrace();
       }
@@ -141,12 +177,12 @@ is just an example of how to implement such a queue. It must be concurrent safe 
 "at once," (multiple worker threads to add to the queue, and consumer thread to remove from it).*/
 
 class UnverifiedBlockConsumer implements Runnable {
-  BlockingQueue<String> queue;
+  BlockingQueue<BlockRecord> queue;
 //  int PID;
-  UnverifiedBlockConsumer(BlockingQueue<String> queue){ this.queue = queue; }
+  UnverifiedBlockConsumer(BlockingQueue<BlockRecord> queue){ this.queue = queue; }
 
   public void run(){
-    String data;
+    BlockRecord data;
     PrintStream toServer;
     Socket sock;
 //    String newblockchain;
@@ -157,7 +193,7 @@ class UnverifiedBlockConsumer implements Runnable {
       while(true){ // Consume from the incoming queue. Do the work to verify. Mulitcast new blockchain
         // TODO notice here the data object is the unverifiedBlock
         data = queue.take(); // Will blocked-wait on empty queue
-        System.out.println("Consumer got unverified:\n" + data + "\n");
+        System.out.println("Consumer got unverified Block:\n" + "BlockID: " + data + "\n");
 
         // TODO Ordinarily we would do real work here, based on the incoming data.
         int j; // Here we fake doing some work (That is, here we could cheat, so not ACTUAL work...)
@@ -170,21 +206,21 @@ class UnverifiedBlockConsumer implements Runnable {
         /* With duplicate blocks that have been verified by different processes ordinarily we would keep only the one with
         the lowest verification timestamp. For the example we use a crude filter, which also may let some duplicates through */
         // TODO create a true filter for the lowest timestamp
-        if(Blockchain.blockchain.indexOf(data.substring(1, 9)) < 0) { // Crude, but excludes most duplicates.
-          fakeVerifiedBlock = "[" + data + " verified by P" + Blockchain.PID + " at time "
-            + ThreadLocalRandom.current().nextInt(100,1000) + "]\n";
-          System.out.println(fakeVerifiedBlock);
-          String tempblockchain = fakeVerifiedBlock + Blockchain.blockchain; // add the verified block to the chain
-          for(int i = 0; i < Blockchain.numProcesses; i++){ // send to each process in group, including us:
-            sock = new Socket(Blockchain.serverName, Ports.BlockchainServerPortBase + (i));
-            toServer = new PrintStream(sock.getOutputStream());
-
-            // make the multicast
-            toServer.println(tempblockchain); toServer.flush();
-
-            sock.close();
-          }
-        }
+//        if(Blockchain.blockchain.indexOf(data.substring(1, 9)) < 0) { // Crude, but excludes most duplicates.
+//          fakeVerifiedBlock = "[" + data + " verified by P" + Blockchain.PID + " at time "
+//            + ThreadLocalRandom.current().nextInt(100,1000) + "]\n";
+//          System.out.println(fakeVerifiedBlock);
+//          String tempblockchain = fakeVerifiedBlock + Blockchain.blockchain; // add the verified block to the chain
+//          for(int i = 0; i < Blockchain.numProcesses; i++){ // send to each process in group, including us:
+//            sock = new Socket(Blockchain.serverName, Ports.BlockchainServerPortBase + (i));
+//            toServer = new PrintStream(sock.getOutputStream());
+//
+//            // make the multicast
+//            toServer.println(tempblockchain); toServer.flush();
+//
+//            sock.close();
+//          }
+//        }
         Thread.sleep(1500); // For the example, wait for our blockchain to be updated before processing a new block
       }
     } catch (Exception e) {
@@ -236,7 +272,7 @@ public class Blockchain {
   static String blockchain = "[First block]";
 
   // TODO don't forget to change this back to 3 when not DEBUGGING
-  final static int numProcesses = 3; // Set this to match your batch execution file that starts N processes with args 0,1,2,...N
+  final static int numProcesses = 1; // Set this to match your batch execution file that starts N processes with args 0,1,2,...N
   static int PID;
 
   // Multicast some data to each of the processes.
@@ -247,14 +283,12 @@ public class Blockchain {
 
       Thread.sleep(1000); // wait for keys to settle, normally would wait for an ack
 
-      //Fancy arithmetic is just to generate identifiable blockIDs out of numerical sort order:
-//      String fakeBlockA = "(Block#" + ((Blockchain.PID+1)*10)+4 + " from P"+ Blockchain.PID + ")";
-//      String fakeBlockB = "(Block#" + ((Blockchain.PID+1)*10)+3 + " from P"+ Blockchain.PID + ")";
+//      broadcast(Ports.BlockchainServerPort, blockchain);
 
       String [] args = { String.valueOf(PID) } ;
       String XMLBlock = BlockInput.getXMLBlock(args);
 
-      List<String> blocks =  unMarshallBlocks(XMLBlock);
+      List<String> blocks =  stripBlockLedgerHeader(XMLBlock);
 
       for (String block : blocks) {
         block = block.replace("\n", "--linebreak--");
@@ -266,7 +300,7 @@ public class Blockchain {
     }
   }
 
-  private List<String> unMarshallBlocks(String xmlBlock) {
+  private List<String> stripBlockLedgerHeader(String xmlBlock) {
 
     String[] blocks = xmlBlock.split("\n\n");
     blocks[0] = blocks[0].split("<BlockLedger>")[1].trim();
@@ -293,7 +327,7 @@ public class Blockchain {
     System.out.println("Robert's BlockFramework control-c to quit.\n");
     System.out.println("Using processID " + PID + "\n");
 
-    final BlockingQueue<String> queue = new PriorityBlockingQueue<>(); // Concurrent queue for unverified blocks
+    final BlockingQueue<BlockRecord> queue = new PriorityBlockingQueue<>(); // Concurrent queue for unverified blocks
     new Ports().setPorts(); // Establish OUR port number scheme, based on PID
 
     // New thread to process incoming public keys
@@ -317,8 +351,9 @@ public class Blockchain {
 // BEGIN BlockInputE //
 
 @XmlRootElement
-class BlockRecord{
+class BlockRecord implements Comparable {
   /* Examples of block fields: */
+  String Timestamp;
   String SHA256String;
   String SignedSHA256;
   String BlockID;
@@ -335,6 +370,10 @@ class BlockRecord{
 
   /* Examples of accessors for the BlockRecord fields. Note that the XML tools sort the fields alphabetically
      by name of accessors, so A=header, F=Indentification, G=Medical: */
+
+  public String getATimestamp() {return Timestamp;}
+  @XmlElement
+  public void setATimestamp(String TS){this.Timestamp = TS;}
 
   public String getASHA256String() {return SHA256String;}
   @XmlElement
@@ -384,6 +423,25 @@ class BlockRecord{
   @XmlElement
   public void setGRx(String D){this.Rx = D;}
 
+  @Override
+  public String toString() {
+    return this.getABlockID();
+  }
+
+  @Override
+  public int compareTo(Object o) {
+
+    Instant otherInstant;
+
+    BlockRecord other = (BlockRecord) o;
+
+    otherInstant = Instant.parse(other.getATimestamp());
+    Instant thisInstant = Instant.parse(this.getATimestamp());
+
+    // https://docs.oracle.com/javase/8/docs/api/java/lang/Comparable.html
+    // Returns a negative integer, zero, or a positive integer as this object is less than, equal to, or greater than the specified object.
+    return thisInstant.compareTo(otherInstant);
+  }
 }
 
 
@@ -399,6 +457,22 @@ class BlockInput {
   private static final int iDIAG = 4;
   private static final int iTREAT = 5;
   private static final int iRX = 6;
+
+  // If using a real key I would base it on this:
+  // https://www.quickprogrammingtips.com/java/how-to-create-sha256-rsa-signature-using-java.html
+  private static String signSHA256(String input, String privateKey) throws Exception {
+
+    String hashInput = privateKey + input;
+
+    MessageDigest MD = MessageDigest.getInstance("SHA-256");
+    byte[] bytesHash = MD.digest(hashInput.getBytes("UTF-8"));
+
+    // Turn into a string of hex values
+    String SHAString = DatatypeConverter.printHexBinary(bytesHash);
+
+    return SHAString;
+  }
+
 
   public static String getXMLBlock(String[] args) throws Exception {
 
@@ -453,10 +527,24 @@ class BlockInput {
       while ((InputLineStr = br.readLine()) != null) {
         blockArray[n] = new BlockRecord();
 
-        // TODO Generate SHA 256 String?
-        blockArray[n].setASHA256String("SHA string goes here...");
-        // TODO Sign said SHA 256
-        blockArray[n].setASignedSHA256("Signed SHA string goes here...");
+        String TS = Instant.now().toString();
+        blockArray[n].setATimestamp(TS);
+
+
+        // Get the hash value.  I decided to create the SHAString from the current Timestamp
+        MessageDigest MD = MessageDigest.getInstance("SHA-256");
+        byte[] bytesHash = MD.digest(TS.getBytes("UTF-8"));
+
+        // Turn into a string of hex values
+        String SHAString = DatatypeConverter.printHexBinary(bytesHash);
+//        System.out.println("Hash is: " + SHAString);
+
+        // I decided to create the SHAString from the current Timestamp
+        blockArray[n].setASHA256String(SHAString);
+
+        // We will "sign" by generating a new SHA256 based on the on the process number plus the original SHA256
+        // Getting a real private key setup takes some more time to code but signing works the same way
+        blockArray[n].setASignedSHA256(signSHA256(SHAString, String.valueOf(pnum)));
 
         /* CDE: Generate a unique blockID. This would also be signed by creating process: */
         idA = UUID.randomUUID();

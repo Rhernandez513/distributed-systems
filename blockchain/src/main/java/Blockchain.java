@@ -28,6 +28,7 @@ Verfy the signature with public key that has been restored.
 import javax.xml.bind.DatatypeConverter;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
+import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 import javax.xml.bind.annotation.XmlElement;
@@ -101,6 +102,39 @@ class PublicKeyServer implements Runnable {
   }
 }
 
+class XMLHandler {
+  static String marshallXMLBlock(BlockRecord blockRecord) throws JAXBException {
+    JAXBContext jaxbContext = JAXBContext.newInstance(BlockRecord.class);
+    Marshaller jaxbMarshaller = jaxbContext.createMarshaller();
+    StringWriter sw = new StringWriter();
+
+    jaxbMarshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
+    jaxbMarshaller.marshal(blockRecord, sw);
+    return sw.toString();
+  }
+  static BlockRecord unMarshallXMLBlock(String XMLBlock) {
+
+    XMLBlock.replace("\n", "");
+
+    // From: https://www.intertech.com/Blog/jaxb-tutorial-how-to-marshal-and-unmarshal-xml/
+    // Credit to Joseph Varilla from class for the link
+    try {
+      JAXBContext jaxbContext = JAXBContext.newInstance(BlockRecord.class);
+      Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
+
+      // Unmarshallers are not thread-safe.  Create a new one every time.
+      XMLStreamReader reader = XMLInputFactory.newInstance().createXMLStreamReader(new StringReader(XMLBlock));
+
+      JAXBElement<BlockRecord> result = jaxbUnmarshaller.unmarshal(reader, BlockRecord.class);
+      return result.getValue();
+
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    return null;
+  }
+}
+
 class UnverifiedBlockServer implements Runnable {
   BlockingQueue<BlockRecord> queue;
   UnverifiedBlockServer(BlockingQueue<BlockRecord> queue){
@@ -114,28 +148,6 @@ class UnverifiedBlockServer implements Runnable {
     Socket sock;
     UnverifiedBlockWorker (Socket s) {sock = s;}
 
-    private BlockRecord unMarshallXMLBlock(String XMLBlock) {
-
-      XMLBlock.replace("\n", "");
-
-      // From: https://www.intertech.com/Blog/jaxb-tutorial-how-to-marshal-and-unmarshal-xml/
-      // Credit to Joseph Varilla from class for the link
-      try {
-        JAXBContext jaxbContext = JAXBContext.newInstance(BlockRecord.class);
-        Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
-
-        // Unmarshallers are not thread-safe.  Create a new one every time.
-        XMLStreamReader reader = XMLInputFactory.newInstance().createXMLStreamReader(new StringReader(XMLBlock));
-
-        JAXBElement<BlockRecord> result = jaxbUnmarshaller.unmarshal(reader, BlockRecord.class);
-        return result.getValue();
-
-      } catch (Exception e) {
-        e.printStackTrace();
-      }
-      return null;
-    }
-
     public void run(){
       try (BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream()))){
         String data = in.readLine ();
@@ -143,7 +155,7 @@ class UnverifiedBlockServer implements Runnable {
         data = data.substring(6);
         data = data.replace("--linebreak--", "\n");
 
-        BlockRecord blockRecord = unMarshallXMLBlock(data);
+        BlockRecord blockRecord = XMLHandler.unMarshallXMLBlock(data);
 
         System.out.println("Put in priority queue:\n" + data + "\n");
         queue.put(blockRecord);
@@ -181,6 +193,16 @@ class UnverifiedBlockConsumer implements Runnable {
     this.PID = PID;
   }
 
+  private List<BlockRecord> parseBlocksFromBlockChain(String chain) {
+
+    String[] blocks = chain.split("</blockRecord>");
+    String firstRecord = blocks[blocks.length - 1];
+    for (int i = 0; i < blocks.length - 1; ++i) {
+      blocks[i] = blocks[i] + "</blockRecord>";
+    }
+    return null;
+  }
+
   public void run(){
     BlockRecord data;
     PrintStream toServer;
@@ -195,7 +217,8 @@ class UnverifiedBlockConsumer implements Runnable {
         System.out.println("Consumer got unverified Block:\n" + data + "\n");
 
 
-        BlockRecord verifiedBlock = WorkB.verifyBlock(data, this.PID);
+        String previousHash = "";
+        BlockRecord verifiedBlock = WorkB.verifyBlock(data, this.PID, previousHash);
         verifiedBlock.setAVerificationProcessID(Integer.toString(this.PID));
 
         // !! At this point a block should be "solved" !! //
@@ -371,6 +394,10 @@ class BlockRecord implements Comparable {
   /* Examples of accessors for the BlockRecord fields. Note that the XML tools sort the fields alphabetically
      by name of accessors, so A=header, F=Indentification, G=Medical: */
 
+  public String getAPreviousHash() {return this.PreviousHash;}
+  @XmlElement
+  public void setAPreviousHash(String previousHash){this.PreviousHash = previousHash;}
+
   public String getABlockData() {return this.BlockData;}
   @XmlElement
   public void setABlockData(String blockData){this.BlockData = blockData;}
@@ -441,7 +468,7 @@ class BlockRecord implements Comparable {
       jaxbMarshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
       jaxbMarshaller.marshal(this, sw);
 
-      String result = sw.toString();
+      String result = XMLHandler.marshallXMLBlock(this);
 
       String XMLHeader = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
       String cleanBlock = result.replace(XMLHeader, "");
@@ -524,13 +551,6 @@ class BlockInput {
 
       BlockRecord[] blockArray = new BlockRecord[20];
 
-      JAXBContext jaxbContext = JAXBContext.newInstance(BlockRecord.class);
-      Marshaller jaxbMarshaller = jaxbContext.createMarshaller();
-      StringWriter sw = new StringWriter();
-
-      // CDE Make the output pretty printed:
-      jaxbMarshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
-
       int n = 0;
 
       while ((InputLineStr = br.readLine()) != null) {
@@ -571,11 +591,11 @@ class BlockInput {
       }
       System.out.println("\n");
 
-      stringXML = sw.toString();
+      StringBuilder builder = new StringBuilder();
       for(int i=0; i < n; i++){
-        jaxbMarshaller.marshal(blockArray[i], sw);
+        builder.append(XMLHandler.marshallXMLBlock(blockArray[i]));
       }
-      String fullBlock = sw.toString();
+      String fullBlock = builder.toString();
       String XMLHeader = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
       String cleanBlock = fullBlock.replace(XMLHeader, "");
       // Show the string of concatenated, individual XML blocks:
@@ -620,7 +640,7 @@ class WorkB {
   }
 
 
-  public static BlockRecord verifyBlock(BlockRecord inputBlock, int PID) throws Exception {
+  public static BlockRecord verifyBlock(BlockRecord inputBlock, int PID, String previousHash) throws Exception {
     String inputBlockWithBlockData;  // Random seed string concatenated with the existing data
     String hashStringOut; // Will contain the new SHA256 string converted to HEX and printable.
     int workNumber;
@@ -630,8 +650,6 @@ class WorkB {
         randomString = randomAlphaNumeric(8);
 
         inputBlock.setABlockData(randomString);
-
-        // Concatenate with our input string (which represents Blockdata)
         inputBlockWithBlockData = inputBlock.toString().replace("\n", "").replace(" ", "");
 
         // Get the hash value

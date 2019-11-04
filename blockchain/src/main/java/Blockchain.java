@@ -37,6 +37,10 @@ import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamReader;
 import java.io.*;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -213,8 +217,6 @@ class UnverifiedBlockConsumer implements Runnable {
     BlockRecord data;
     PrintStream toServer;
     Socket sock;
-    String newblockchain = Blockchain.blockchain;
-    String fakeVerifiedBlock;
 
     System.out.println("Starting the Unverified Block Priority Queue Consumer thread.\n");
     try{
@@ -234,18 +236,14 @@ class UnverifiedBlockConsumer implements Runnable {
         }
 
         BlockRecord verifiedBlock = WorkB.verifyBlock(data, this.PID, previousHash);
+        // We assign the verification process ID after verifying because we don't want the solution to be dependent on
+        // running on a specific process
         verifiedBlock.setAVerificationProcessID(Integer.toString(this.PID));
 
         // !! At this point a block should be "solved" !! //
 
-        // The blow logic is primarily concerned with determining if the "solved" block can be appened to the end of the
+        // The blow logic is primarily concerned with determining if the "solved" block can be appended to the end of the
         // block chain and then rebroadcasting it to the rest of the chain
-
-        /* With duplicate blocks that have been verified by different processes ordinarily we would keep only the one with
-        the lowest verification timestamp. For the example we use a crude filter, which also may let some duplicates through */
-//        if(Blockchain.blockchain.indexOf(data.substring(1, 9)) < 0) { // Crude, but excludes most duplicates.
-//          fakeVerifiedBlock = "[" + data + " verified by P" + Blockchain.PID + " at time " + Instant.now() + "]\n";
-//          System.out.println(fakeVerifiedBlock);
           String tempblockchain = verifiedBlock.toString().replace(" ", "") + Blockchain.blockchain; // add the verified block to the chain
           for(int i = 0; i < Blockchain.numProcesses; i++){ // send to each process in group, including us:
             sock = new Socket(Blockchain.serverName, Ports.BlockchainServerPortBase + (i));
@@ -253,10 +251,8 @@ class UnverifiedBlockConsumer implements Runnable {
 
             // make the multicast
             toServer.println(tempblockchain); toServer.flush();
-
             sock.close();
           }
-//        }
         Thread.sleep(1500); // For the example, wait for our blockchain to be updated before processing a new block
       }
     } catch (Exception e) {
@@ -268,7 +264,23 @@ class UnverifiedBlockConsumer implements Runnable {
 // Incoming proposed replacement blockchains. Compare to existing. Replace if winner:
 class BlockchainWorker extends Thread {
   Socket sock;
-  BlockchainWorker (Socket s) {sock = s;}
+  int PID;
+  BlockchainWorker (Socket s, int PID) {
+    sock = s;
+    this.PID = PID;
+  }
+
+  private String prependXMLHeader(String xmlLedger) {
+    String XMLHeader = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
+    return XMLHeader + xmlLedger;
+  }
+
+  private String insertBlockLedgerHeader(String xmlLedger) {
+    String prefix = "<BlockLedger>\n";
+    String postFix = "</BlockLedger>\n";
+    return prefix + xmlLedger.replace("[First block]", "") + postFix;
+  }
+
   public void run(){
     try{
       BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream()));
@@ -281,11 +293,21 @@ class BlockchainWorker extends Thread {
       Blockchain.blockchain = data; // Would normally have to check first for winner before replacing.
       System.out.println("         --NEW BLOCKCHAIN--\n" + Blockchain.blockchain + "\n\n");
       sock.close();
+      if(this.PID == 0) {
+        String tempBlockChain = prependXMLHeader(insertBlockLedgerHeader(Blockchain.blockchain));
+        List<String> lines = Arrays.asList(tempBlockChain);
+        Path file = Paths.get("BlockchainLedger.xml");
+        Files.write(file, lines, StandardCharsets.UTF_8);
+      }
     } catch (IOException x){x.printStackTrace();}
   }
 }
 
 class BlockchainServer implements Runnable {
+  private int PID;
+  BlockchainServer(int PID) {
+    this.PID = PID;
+  }
   public void run(){
     Socket sock;
     System.out.println("Starting the blockchain server input thread using " + Ports.BlockchainServerPort);
@@ -293,7 +315,7 @@ class BlockchainServer implements Runnable {
       ServerSocket servsock = new ServerSocket(Ports.BlockchainServerPort, Blockchain.Q_LEN);
       while (true) {
         sock = servsock.accept();
-        new BlockchainWorker (sock).start();
+        new BlockchainWorker (sock, this.PID).start();
       }
     }catch (IOException ioe) {System.out.println(ioe);}
   }
@@ -371,7 +393,7 @@ public class Blockchain {
     // New thread to process incoming unverified blocks
     new Thread(new UnverifiedBlockServer(queue)).start();
     // New thread to process incoming new blockchains
-    new Thread(new BlockchainServer()).start();
+    new Thread(new BlockchainServer(PID)).start();
     // Wait for servers to start.
     try{Thread.sleep(1000);}catch(Exception e){}
     // Multicast some new unverified blocks out to all servers as data

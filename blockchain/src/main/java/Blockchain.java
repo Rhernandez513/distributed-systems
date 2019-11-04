@@ -39,8 +39,11 @@ import java.io.*;
 import java.net.*;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.*;
 
@@ -194,13 +197,16 @@ class UnverifiedBlockConsumer implements Runnable {
   }
 
   private List<BlockRecord> parseBlocksFromBlockChain(String chain) {
+    List<BlockRecord> l = new ArrayList<>();
 
     String[] blocks = chain.split("</blockRecord>");
     String firstRecord = blocks[blocks.length - 1];
     for (int i = 0; i < blocks.length - 1; ++i) {
       blocks[i] = blocks[i] + "</blockRecord>";
+      l.add(XMLHandler.unMarshallXMLBlock(blocks[i]));
     }
-    return null;
+
+    return l;
   }
 
   public void run(){
@@ -216,8 +222,17 @@ class UnverifiedBlockConsumer implements Runnable {
         data = queue.take(); // Will blocked-wait on empty queue
         System.out.println("Consumer got unverified Block:\n" + data + "\n");
 
+        String previousHash;
 
-        String previousHash = "";
+        List<BlockRecord> blocksFromBlockChain = parseBlocksFromBlockChain(Blockchain.blockchain);
+
+        if(blocksFromBlockChain.size() == 0) {
+          // We are dealing with the first block
+          previousHash = "[First block]";
+        } else {
+          previousHash = blocksFromBlockChain.get(0).getASHA256String();
+        }
+
         BlockRecord verifiedBlock = WorkB.verifyBlock(data, this.PID, previousHash);
         verifiedBlock.setAVerificationProcessID(Integer.toString(this.PID));
 
@@ -644,6 +659,8 @@ class WorkB {
     String inputBlockWithBlockData;  // Random seed string concatenated with the existing data
     String hashStringOut; // Will contain the new SHA256 string converted to HEX and printable.
     int workNumber;
+
+    inputBlock.setAPreviousHash(previousHash);
 
     try {
       for(int i=1; i<20; i++) { // Limit how long we try for this example.

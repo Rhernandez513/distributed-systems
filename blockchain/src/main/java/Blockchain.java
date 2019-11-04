@@ -25,8 +25,6 @@ Verfy the signature with public key that has been restored.
 
 */
 
-import sun.jvm.hotspot.opto.Block;
-
 import javax.xml.bind.DatatypeConverter;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
@@ -177,14 +175,17 @@ is just an example of how to implement such a queue. It must be concurrent safe 
 
 class UnverifiedBlockConsumer implements Runnable {
   BlockingQueue<BlockRecord> queue;
-//  int PID;
-  UnverifiedBlockConsumer(BlockingQueue<BlockRecord> queue){ this.queue = queue; }
+  int PID;
+  UnverifiedBlockConsumer(BlockingQueue<BlockRecord> queue, int PID){
+    this.queue = queue;
+    this.PID = PID;
+  }
 
   public void run(){
     BlockRecord data;
     PrintStream toServer;
     Socket sock;
-//    String newblockchain;
+    String newblockchain = Blockchain.blockchain;
     String fakeVerifiedBlock;
 
     System.out.println("Starting the Unverified Block Priority Queue Consumer thread.\n");
@@ -193,14 +194,9 @@ class UnverifiedBlockConsumer implements Runnable {
         data = queue.take(); // Will blocked-wait on empty queue
         System.out.println("Consumer got unverified Block:\n" + data + "\n");
 
-        // TODO Ordinarily we would do real work here, based on the incoming data.
-        int j; // Here we fake doing some work (That is, here we could cheat, so not ACTUAL work...)
-        for(int i=0; i< 100; i++){ // put a limit on the fake work for this example
-          j = ThreadLocalRandom.current().nextInt(0,10);
-          try { Thread.sleep(500); } catch(Exception e) { e.printStackTrace(); }
-          if (j < 3) break; // <- how hard our fake work is; about 1.5 seconds.
-        }
 
+        BlockRecord verifiedBlock = WorkB.verifyBlock(data, this.PID);
+        verifiedBlock.setAVerificationProcessID(Integer.toString(this.PID));
 
         // !! At this point a block should be "solved" !! //
 
@@ -209,21 +205,19 @@ class UnverifiedBlockConsumer implements Runnable {
 
         /* With duplicate blocks that have been verified by different processes ordinarily we would keep only the one with
         the lowest verification timestamp. For the example we use a crude filter, which also may let some duplicates through */
-//        // TODO create a true filter for the lowest timestamp
 //        if(Blockchain.blockchain.indexOf(data.substring(1, 9)) < 0) { // Crude, but excludes most duplicates.
-//          fakeVerifiedBlock = "[" + data + " verified by P" + Blockchain.PID + " at time "
-//            + ThreadLocalRandom.current().nextInt(100,1000) + "]\n";
+//          fakeVerifiedBlock = "[" + data + " verified by P" + Blockchain.PID + " at time " + Instant.now() + "]\n";
 //          System.out.println(fakeVerifiedBlock);
-//          String tempblockchain = fakeVerifiedBlock + Blockchain.blockchain; // add the verified block to the chain
-//          for(int i = 0; i < Blockchain.numProcesses; i++){ // send to each process in group, including us:
-//            sock = new Socket(Blockchain.serverName, Ports.BlockchainServerPortBase + (i));
-//            toServer = new PrintStream(sock.getOutputStream());
-//
-//            // make the multicast
-//            toServer.println(tempblockchain); toServer.flush();
-//
-//            sock.close();
-//          }
+          String tempblockchain = verifiedBlock.toString().replace(" ", "") + Blockchain.blockchain; // add the verified block to the chain
+          for(int i = 0; i < Blockchain.numProcesses; i++){ // send to each process in group, including us:
+            sock = new Socket(Blockchain.serverName, Ports.BlockchainServerPortBase + (i));
+            toServer = new PrintStream(sock.getOutputStream());
+
+            // make the multicast
+            toServer.println(tempblockchain); toServer.flush();
+
+            sock.close();
+          }
 //        }
         Thread.sleep(1500); // For the example, wait for our blockchain to be updated before processing a new block
       }
@@ -267,7 +261,7 @@ class BlockchainServer implements Runnable {
   }
 }
 
-// Class bc for BlockChain
+// Solution class for BlockChain assignment
 public class Blockchain {
 
   public final static int Q_LEN = 6;
@@ -287,7 +281,7 @@ public class Blockchain {
 
       Thread.sleep(1000); // wait for keys to settle, normally would wait for an ack
 
-//      broadcast(Ports.BlockchainServerPort, blockchain);
+      broadcast(Ports.BlockchainServerPort, blockchain);
 
       String [] args = { String.valueOf(PID) } ;
       String XMLBlock = BlockInput.getXMLBlock(args);
@@ -313,7 +307,7 @@ public class Blockchain {
     return Arrays.asList(blocks);
   }
 
-  private void broadcast(int port, String payload) throws IOException {
+  public static void broadcast(int port, String payload) throws IOException {
     Socket sock;
     PrintStream toServer;
     for(int i=0; i< numProcesses; i++){// Send a sample unverified block to each server
@@ -348,7 +342,7 @@ public class Blockchain {
     try{Thread.sleep(1000);}catch(Exception e){}
 
     // Start consuming the queued-up unverified blocks
-    new Thread(new UnverifiedBlockConsumer(queue)).start();
+    new Thread(new UnverifiedBlockConsumer(queue, PID)).start();
   }
 }
 
@@ -357,6 +351,8 @@ public class Blockchain {
 @XmlRootElement
 class BlockRecord implements Comparable {
   /* Examples of block fields: */
+  int BlockNum;
+  String BlockData;
   String Timestamp;
   String SHA256String;
   String SignedSHA256;
@@ -374,6 +370,14 @@ class BlockRecord implements Comparable {
 
   /* Examples of accessors for the BlockRecord fields. Note that the XML tools sort the fields alphabetically
      by name of accessors, so A=header, F=Indentification, G=Medical: */
+
+  public String getABlockData() {return this.BlockData;}
+  @XmlElement
+  public void setABlockData(String blockData){this.BlockData = blockData;}
+
+  public int getABlockNum() {return this.BlockNum;}
+  @XmlElement
+  public void setABlockNum(int blockNum){this.BlockNum = blockNum;}
 
   public String getATimestamp() {return Timestamp;}
   @XmlElement
@@ -442,7 +446,7 @@ class BlockRecord implements Comparable {
       String XMLHeader = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
       String cleanBlock = result.replace(XMLHeader, "");
 
-      return cleanBlock;
+      return cleanBlock.trim();
     } catch (Exception e) {
       e.printStackTrace();
     }
@@ -465,7 +469,6 @@ class BlockRecord implements Comparable {
   }
 }
 
-
 class BlockInput {
 
   private static String FILENAME;
@@ -478,21 +481,6 @@ class BlockInput {
   private static final int iDIAG = 4;
   private static final int iTREAT = 5;
   private static final int iRX = 6;
-
-  // If using a real key I would base it on this:
-  // https://www.quickprogrammingtips.com/java/how-to-create-sha256-rsa-signature-using-java.html
-  private static String signSHA256(String input, String privateKey) throws Exception {
-
-    String hashInput = privateKey + input;
-
-    MessageDigest MD = MessageDigest.getInstance("SHA-256");
-    byte[] bytesHash = MD.digest(hashInput.getBytes("UTF-8"));
-
-    // Turn into a string of hex values
-    String SHAString = DatatypeConverter.printHexBinary(bytesHash);
-
-    return SHAString;
-  }
 
 
   public static String getXMLBlock(String[] args) throws Exception {
@@ -551,21 +539,11 @@ class BlockInput {
         String TS = Instant.now().toString();
         blockArray[n].setATimestamp(TS);
 
-
-        // Get the hash value.  I decided to create the SHAString from the current Timestamp
-        MessageDigest MD = MessageDigest.getInstance("SHA-256");
-        byte[] bytesHash = MD.digest(TS.getBytes("UTF-8"));
-
-        // Turn into a string of hex values
-        String SHAString = DatatypeConverter.printHexBinary(bytesHash);
-//        System.out.println("Hash is: " + SHAString);
-
-        // I decided to create the SHAString from the current Timestamp
-        blockArray[n].setASHA256String(SHAString);
+        blockArray[n].setASHA256String("");
 
         // We will "sign" by generating a new SHA256 based on the on the process number plus the original SHA256
         // Getting a real private key setup takes some more time to code but signing works the same way
-        blockArray[n].setASignedSHA256(signSHA256(SHAString, String.valueOf(pnum)));
+        blockArray[n].setASignedSHA256("");
 
         /* CDE: Generate a unique blockID. This would also be signed by creating process: */
         idA = UUID.randomUUID();
@@ -604,6 +582,88 @@ class BlockInput {
       String XMLBlock = XMLHeader + "\n<BlockLedger>" + cleanBlock + "</BlockLedger>";
       return XMLBlock;
     } catch (IOException e) {e.printStackTrace();}
+    return null;
+  }
+}
+
+class WorkB {
+
+  private static final String ALPHA_NUMERIC_STRING = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  static String someText = "one two three";
+  static String randomString;
+
+  // Gets a new random AlphaNumeric seed string
+  public static String randomAlphaNumeric(int count) {
+    StringBuilder builder = new StringBuilder();
+    while (count-- != 0) {
+      int character = (int)(Math.random()*ALPHA_NUMERIC_STRING.length());
+      builder.append(ALPHA_NUMERIC_STRING.charAt(character));
+    }
+    return builder.toString();
+  }
+
+  // If using a real key I would base it on this:
+  // https://www.quickprogrammingtips.com/java/how-to-create-sha256-rsa-signature-using-java.html
+  // We will "sign" by generating a new SHA256 based on the on the process number ("private key") plus the original SHA256
+  // Getting a real private key setup takes some more time to code but signing works the same way
+  private static String signSHA256(String input, String privateKey) throws Exception {
+
+    String hashInput = privateKey + input;
+
+    MessageDigest MD = MessageDigest.getInstance("SHA-256");
+    byte[] bytesHash = MD.digest(hashInput.getBytes("UTF-8"));
+
+    // Turn into a string of hex values
+    String SHAString = DatatypeConverter.printHexBinary(bytesHash);
+
+    return SHAString;
+  }
+
+
+  public static BlockRecord verifyBlock(BlockRecord inputBlock, int PID) throws Exception {
+    String inputBlockWithBlockData;  // Random seed string concatenated with the existing data
+    String hashStringOut; // Will contain the new SHA256 string converted to HEX and printable.
+    int workNumber;
+
+    try {
+      for(int i=1; i<20; i++) { // Limit how long we try for this example.
+        randomString = randomAlphaNumeric(8);
+
+        inputBlock.setABlockData(randomString);
+
+        // Concatenate with our input string (which represents Blockdata)
+        inputBlockWithBlockData = inputBlock.toString().replace("\n", "").replace(" ", "");
+
+        // Get the hash value
+        MessageDigest MD = MessageDigest.getInstance("SHA-256");
+        byte[] bytesHash = MD.digest(inputBlockWithBlockData.getBytes("UTF-8"));
+
+        // Turn into a string of hex values
+        hashStringOut = DatatypeConverter.printHexBinary(bytesHash);
+        System.out.println("Hash is: " + hashStringOut);
+
+        // Between 0000 (0) and FFFF (65535)
+        workNumber = Integer.parseInt(hashStringOut.substring(0,4),16);
+
+        System.out.println("First 16 bits in Hex and Decimal: " + hashStringOut.substring(0,4) +" and " + workNumber);
+
+        if (!(workNumber < 20000)) {  // lower number = more work.
+          System.out.format("%d is not less than 20,000 so we did not solve the puzzle\n\n", workNumber);
+        }
+        if (workNumber < 20000) {
+          System.out.format("%d IS less than 20,000 so puzzle solved!\n", workNumber);
+          System.out.println("The seed (puzzle answer) was: " + randomString);
+          inputBlock.setASHA256String(hashStringOut);
+          inputBlock.setASignedSHA256(signSHA256(inputBlock.getASHA256String(), String.valueOf(PID)));
+          return inputBlock;
+        }
+        // TODO Here is where you would periodically check to see if the blockchain has been updated
+        // ...if so, then abandon this verification effort and start over.
+        // Here is where you will sleep if you want to extend the time up to a second or two.
+      }
+    } catch(Exception ex) {
+      ex.printStackTrace();
+    }
     return null;
   }
 }
